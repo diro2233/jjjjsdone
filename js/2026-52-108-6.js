@@ -488,7 +488,7 @@ function startTaskChecker() {
   taskCheckTimer = setInterval(() => {
     checkScheduledTasks();
     renderTaskList(); // 更新倒计时显示
-  }, 300); // 每 300ms 检查一次，更快卡点抢单
+  }, 100); // 每 100ms 检查一次
   
   log("✔ 定时任务检查器已启动");
 }
