@@ -9,7 +9,7 @@ let tokenExpireTime = 0;
 // 重试配置
 const RETRY_DELAYS = [1000, 3000, 5000];
 
-// 新增：定时任务管理
+// 定时任务管理
 let scheduledTasks = [];
 let taskCheckTimer = null;
 
@@ -249,7 +249,7 @@ async function ensureLogin() {
   return await login(user, pass);
 }
 
-// 新增：查询商品详情获取公示结束时间
+// 查询商品详情获取公示结束时间
 async function getGoodsDetail(goodsId) {
   try {
     const res = await fetch(`https://api.52108.com/api/services/cbg/Goods/GetById?id=${goodsId}`);
@@ -265,7 +265,7 @@ async function getGoodsDetail(goodsId) {
   }
 }
 
-// 新增：创建定时下单任务
+// 创建定时下单任务
 async function createScheduledTask(goodsId, errorMessage) {
   log(`⏰ 检测到公示期限制，正在查询商品详情...`);
   
@@ -303,12 +303,12 @@ async function createScheduledTask(goodsId, errorMessage) {
   await pushBark("创建定时下单任务", `${task.goodsName} | ${task.server} | ${task.price}元 | ${noticeEndTime.toLocaleString()}`, `http://dms.52108.com/#/pages/shop/detail?id=${goodsId}`);
 }
 
-// 新增：保存定时任务到本地存储
+// 保存定时任务到本地存储
 function saveScheduledTasks() {
   localStorage.setItem("scheduledTasks", JSON.stringify(scheduledTasks));
 }
 
-// 新增：从本地存储加载定时任务
+// 从本地存储加载定时任务
 function loadScheduledTasks() {
   const tasksStr = localStorage.getItem("scheduledTasks");
   if (!tasksStr) return;
@@ -323,7 +323,7 @@ function loadScheduledTasks() {
   }
 }
 
-// 新增：删除定时任务
+// 删除定时任务
 function deleteTask(taskId) {
   scheduledTasks = scheduledTasks.filter(t => t.id !== taskId);
   saveScheduledTasks();
@@ -331,7 +331,7 @@ function deleteTask(taskId) {
   log(`已删除任务 ${taskId}`);
 }
 
-// 新增：渲染任务列表
+// 渲染任务列表
 function renderTaskList() {
   const container = document.getElementById('taskList');
   
@@ -419,7 +419,7 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// 新增：检查并执行到期的定时任务
+// 检查并执行到期的定时任务
 async function checkScheduledTasks() {
   const now = Date.now();
   
@@ -481,7 +481,7 @@ async function checkScheduledTasks() {
   }
 }
 
-// 新增：启动定时任务检查器
+// 启动定时任务检查器
 function startTaskChecker() {
   if (taskCheckTimer) return;
   
@@ -493,7 +493,7 @@ function startTaskChecker() {
   log("✔ 定时任务检查器已启动");
 }
 
-// 新增：停止定时任务检查器
+// 停止定时任务检查器
 function stopTaskChecker() {
   if (taskCheckTimer) {
     clearInterval(taskCheckTimer);
