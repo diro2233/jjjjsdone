@@ -11,7 +11,7 @@ let tokenExpireTime = 0;
 const RETRY_DELAYS = [1000, 3000, 5000];
 const FAST_RETRY_DELAY = 0;
 const BURST_MS = 2000;
-const BURST_CONCURRENCY = 12;
+const BURST_CONCURRENCY = 24;
 const SUSTAIN_CONCURRENCY = 6;
 
 // 新增：定时任务管理
