@@ -1,4 +1,4 @@
-//202602100057
+// 202602100111
 let timer = null;
 let seen = new Set();
 let running = false;
@@ -505,8 +505,8 @@ async function checkScheduledTasks() {
     
     const timeUntil = task.noticeEndTime - now;
     
-    // 如果时间到了（提前0.3秒执行）
-    if (timeUntil <= 300 && timeUntil > -60000) { // 提前0.3秒，但不超过1分钟过期
+    // 如果时间到了（提前3秒执行）
+    if (timeUntil <= 3000 && timeUntil > -60000) { // 提前3秒，但不超过1分钟过期
       // 立即标记为处理中，防止检查器下一秒再次触发同一任务
       task.status = 'processing';
       task.statusMessage = '下单中...';
