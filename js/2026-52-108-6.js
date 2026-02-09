@@ -1,3 +1,4 @@
+//202602100013
 let timer = null;
 let seen = new Set();
 let running = false;
@@ -10,7 +11,7 @@ let tokenExpireTime = 0;
 const RETRY_DELAYS = [1000, 3000, 5000];
 const FAST_RETRY_DELAY = 0;
 
-// 定时任务管理
+// 新增：定时任务管理
 let scheduledTasks = [];
 let taskCheckTimer = null;
 
@@ -671,9 +672,10 @@ function getPaymentUrl(orderId) {
 async function pushBark(title, body, url) {
   const bark = barkEl.value.trim();
   if (!bark) return;
+  const soundParam = "sound=update";
   const api = barkJumpEl.checked && url
-    ? `${bark}/${encodeURIComponent(title)}/${encodeURIComponent(body)}?url=${encodeURIComponent(url)}`
-    : `${bark}/${encodeURIComponent(title)}/${encodeURIComponent(body)}`;
+    ? `${bark}/${encodeURIComponent(title)}/${encodeURIComponent(body)}?url=${encodeURIComponent(url)}&${soundParam}`
+    : `${bark}/${encodeURIComponent(title)}/${encodeURIComponent(body)}?${soundParam}`;
   
   try {
     await fetch(api);
