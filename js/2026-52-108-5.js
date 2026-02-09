@@ -1,3 +1,4 @@
+//202602100057
 let timer = null;
 let seen = new Set();
 let running = false;
@@ -8,10 +9,17 @@ let tokenExpireTime = 0;
 
 // 重试配置
 const RETRY_DELAYS = [1000, 3000, 5000];
+const FAST_RETRY_DELAY = 0;
+const BURST_MS = 2000;
+const BURST_CONCURRENCY = 12;
+const SUSTAIN_CONCURRENCY = 6;
 
 // 新增：定时任务管理
 let scheduledTasks = [];
 let taskCheckTimer = null;
+
+// 命中商品列表（用于页面底部展示）
+let matchedGoodsList = [];
 
 function log(msg) {
   const el = document.getElementById("log");
@@ -133,6 +141,70 @@ function matchFlow(target, flows) {
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function isTerminalOrderError(message) {
+  if (!message) return false;
+  const msg = String(message);
+  return (
+    msg.includes("当前商品交易中") ||
+    msg.includes("已售") ||
+    msg.includes("不存在") ||
+    msg.includes("下架") ||
+    msg.includes("库存不足") ||
+    msg.includes("不可购买")
+  );
+}
+
+async function rushOrder(goodsId) {
+  const start = Date.now();
+  const burstEnd = start + BURST_MS;
+  let active = 0;
+  let done = false;
+  let finalResult = null;
+
+  const spawn = () => {
+    if (done) return;
+    active++;
+    (async () => {
+      try {
+        const res = await createOrder(goodsId, 0, { fastRetry: true, maxRetryOverride: 0 });
+        if (res && res.success) {
+          done = true;
+          finalResult = res;
+        } else if (res && res.scheduledTask) {
+          done = true;
+          finalResult = res;
+        } else {
+          const msg = JSON.stringify(res?.error?.message || res);
+          if (isTerminalOrderError(msg)) {
+            done = true;
+            finalResult = { success: false, terminalError: true, message: msg };
+          }
+        }
+      } catch (e) {
+        const msg = e?.message || String(e);
+        if (isTerminalOrderError(msg)) {
+          done = true;
+          finalResult = { success: false, terminalError: true, message: msg };
+        }
+      } finally {
+        active--;
+      }
+    })();
+  };
+
+  while (!done) {
+    const now = Date.now();
+    const targetConcurrency = now <= burstEnd ? BURST_CONCURRENCY : SUSTAIN_CONCURRENCY;
+    while (!done && active < targetConcurrency) {
+      spawn();
+    }
+    if (done) break;
+    await delay(FAST_RETRY_DELAY);
+  }
+
+  return finalResult;
 }
 
 function saveToken(accessToken) {
@@ -264,6 +336,12 @@ async function getGoodsDetail(goodsId) {
 
 // 新增：创建定时下单任务
 async function createScheduledTask(goodsId, errorMessage) {
+  const existing = scheduledTasks.find(t => t.goodsId === goodsId);
+  if (existing) {
+    log(`⏰ 商品ID=${goodsId} 已有定时任务，不再重复创建`);
+    return existing;
+  }
+
   log(`⏰ 检测到公示期限制，正在查询商品详情...`);
   
   const goodsDetail = await getGoodsDetail(goodsId);
@@ -298,6 +376,7 @@ async function createScheduledTask(goodsId, errorMessage) {
   log(`✔ 已创建定时任务: ${task.goodsName} | ${task.server} | ${task.price}元 | 将在 ${noticeEndTime.toLocaleString()} 自动下单`);
   
   await pushBark("创建定时下单任务", `${task.goodsName} | ${task.server} | ${task.price}元 | ${noticeEndTime.toLocaleString()}`, `http://dms.52108.com/#/pages/shop/detail?id=${goodsId}`);
+  return task;
 }
 
 // 新增：保存定时任务到本地存储
@@ -384,6 +463,38 @@ function renderTaskList() {
   }).join('');
 }
 
+// 渲染命中商品列表
+function renderMatchedGoodsList() {
+  const container = document.getElementById('matchedGoodsList');
+  if (!container) return;
+  if (matchedGoodsList.length === 0) {
+    container.innerHTML = '<div class="no-matched">暂无命中记录，开始监听后命中会显示在此</div>';
+    return;
+  }
+  container.innerHTML = matchedGoodsList.map(m => {
+    const url = `http://dms.52108.com/#/pages/shop/detail?id=${m.id}`;
+    return `
+      <div class="matched-item">
+        <span class="matched-name">${escapeHtml(m.name)}</span>
+        <span class="matched-meta">ID: <a href="${url}" target="_blank">${m.id}</a></span>
+        <span class="matched-meta">区服: ${escapeHtml(m.server)}</span>
+        <span class="matched-meta">价格: ${m.price}元</span>
+        <span class="matched-meta">充值: ${m.recharge}</span>
+        <span class="matched-meta">月卡: ${m.days}天</span>
+        <span class="matched-meta">流派: ${escapeHtml(m.flow)}</span>
+        <span class="matched-meta">${m.hitTime}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function escapeHtml(str) {
+  if (str == null) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 // 新增：检查并执行到期的定时任务
 async function checkScheduledTasks() {
   const now = Date.now();
@@ -394,8 +505,8 @@ async function checkScheduledTasks() {
     
     const timeUntil = task.noticeEndTime - now;
     
-    // 如果时间到了（提前5秒执行）
-    if (timeUntil <= 5000 && timeUntil > -60000) { // 提前5秒，但不超过1分钟过期
+    // 如果时间到了（提前0.3秒执行）
+    if (timeUntil <= 300 && timeUntil > -60000) { // 提前0.3秒，但不超过1分钟过期
       // 立即标记为处理中，防止检查器下一秒再次触发同一任务
       task.status = 'processing';
       task.statusMessage = '下单中...';
@@ -405,9 +516,9 @@ async function checkScheduledTasks() {
       log(`⏰ 定时任务到期，开始下单: ${task.goodsName} (ID=${task.goodsId})`);
       
       try {
-        const orderRes = await createOrder(task.goodsId);
+        const orderRes = await rushOrder(task.goodsId);
         
-        if (orderRes.success) {
+        if (orderRes && orderRes.success) {
           const orderId = orderRes.result.id;
           const orderNumber = orderRes.result.orderNumber;
           const paymentUrl = getPaymentUrl(orderId);
@@ -421,10 +532,18 @@ async function checkScheduledTasks() {
           
           // Bark 推送包含支付链接
           await pushBark("定时下单成功", `${task.goodsName} | 订单号:${orderNumber} | 点击去付款`, paymentUrl);
+        } else if (orderRes && orderRes.scheduledTask) {
+          task.status = 'pending';
+          task.statusMessage = '公示期限制';
+          log(`⏰ 仍在公示期，继续等待: ID=${task.goodsId}`);
+        } else if (orderRes && orderRes.terminalError) {
+          task.status = 'error';
+          task.statusMessage = orderRes.message;
+          log(`✘ 定时任务下单失败: ${orderRes.message}`);
         } else {
           task.status = 'error';
-          task.statusMessage = JSON.stringify(orderRes.error?.message || orderRes);
-          log(`✘ 定时任务下单失败: ${task.statusMessage}`);
+          task.statusMessage = '下单失败';
+          log(`✘ 定时任务下单失败: 未知错误`);
         }
       } catch (e) {
         task.status = 'error';
@@ -466,14 +585,18 @@ function stopTaskChecker() {
   }
 }
 
-async function createOrder(goodsId, retryCount = 0) {
-  const maxRetry = Number(orderRetryEl.value) || 3;
+async function createOrder(goodsId, retryCount = 0, options = {}) {
+  const maxRetry = Number.isInteger(options.maxRetryOverride)
+    ? options.maxRetryOverride
+    : (Number(orderRetryEl.value) || 3);
+  const fastRetry = options.fastRetry === true;
   
   try {
     await ensureLogin();
     
     log(`正在生成订单 ID=${goodsId}... (尝试 ${retryCount + 1}/${maxRetry + 1})`);
     
+    const t0 = Date.now();
     const res = await fetch("https://api.52108.com/api/services/cbg/Order/Create", {
       method: "POST",
       headers: {
@@ -482,6 +605,8 @@ async function createOrder(goodsId, retryCount = 0) {
       },
       body: JSON.stringify({ goodsId: Number(goodsId) })
     });
+    const t1 = Date.now();
+    log(`⏱ 下单请求耗时 ${t1 - t0} ms (HTTP ${res.status}) ID=${goodsId}`);
     
     if (res.status === 401) {
       log("⚠ 检测到 401 未授权，Token 已失效");
@@ -492,7 +617,7 @@ async function createOrder(goodsId, retryCount = 0) {
       if (retryCount < maxRetry) {
         log("正在重新登录...");
         await ensureLogin();
-        return createOrder(goodsId, retryCount + 1);
+        return createOrder(goodsId, retryCount + 1, options);
       } else {
         throw new Error("401 未授权，Token 失效");
       }
@@ -525,10 +650,14 @@ async function createOrder(goodsId, retryCount = 0) {
     log(`✘ 下单失败 (尝试 ${retryCount + 1}/${maxRetry + 1}): ${e.message}`);
     
     if (retryCount < maxRetry) {
-      const delayMs = RETRY_DELAYS[retryCount] || 5000;
-      log(`${delayMs / 1000} 秒后重试下单...`);
-      await delay(delayMs);
-      return createOrder(goodsId, retryCount + 1);
+      const delayMs = fastRetry ? FAST_RETRY_DELAY : (RETRY_DELAYS[retryCount] || 5000);
+      if (!fastRetry) {
+        log(`${delayMs / 1000} 秒后重试下单...`);
+      }
+      if (delayMs > 0) {
+        await delay(delayMs);
+      }
+      return createOrder(goodsId, retryCount + 1, options);
     } else {
       log(`✘ 下单失败，已达最大重试次数 (${maxRetry + 1})`);
       throw e;
@@ -578,9 +707,10 @@ function getPaymentUrl(orderId) {
 async function pushBark(title, body, url) {
   const bark = barkEl.value.trim();
   if (!bark) return;
+  const soundParam = "sound=update";
   const api = barkJumpEl.checked && url
-    ? `${bark}/${encodeURIComponent(title)}/${encodeURIComponent(body)}?url=${encodeURIComponent(url)}`
-    : `${bark}/${encodeURIComponent(title)}/${encodeURIComponent(body)}`;
+    ? `${bark}/${encodeURIComponent(title)}/${encodeURIComponent(body)}?url=${encodeURIComponent(url)}&${soundParam}`
+    : `${bark}/${encodeURIComponent(title)}/${encodeURIComponent(body)}?${soundParam}`;
   
   try {
     await fetch(api);
@@ -655,6 +785,19 @@ async function check() {
 
         seen.add(r.item.id);
         matchCount++;
+
+        // 加入命中商品列表（最新在前）
+        matchedGoodsList.unshift({
+          id: r.item.id,
+          name: r.item.name || `商品${r.item.id}`,
+          server: r.server,
+          price: r.item.price,
+          recharge: r.extra.recharge,
+          days: r.extra.days,
+          flow: r.extra.flow,
+          hitTime: new Date().toLocaleString()
+        });
+        renderMatchedGoodsList();
 
         const url = `http://dms.52108.com/#/pages/shop/detail?id=${r.item.id}`;
         const msg = `<a href="${url}" target="_blank">命中ID=${r.item.id} 区服=${r.server} 价格=${r.item.price} 充值=${r.extra.recharge} 月卡=${r.extra.days} 流派=${r.extra.flow}</a>`;
