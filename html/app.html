@@ -332,7 +332,7 @@
   <div class="container">
     <!-- 顶部标题 -->
     <div class="card" style="text-align: center; padding: 20px;">
-      <h1 style="margin: 0;">🛠️ 52108 工具箱V1.0</h1>
+      <h1 style="margin: 0;">🛠️ 52108 工具箱</h1>
     </div>
 
     <!-- Tab 导航 -->
@@ -345,7 +345,7 @@
     <div id="tab-home">
       <!-- 原主页内容 -->
       <div class="card">
-        <h1>🎮 52108商品监听 V3.0（定时下单）</h1>
+        <h1>🎮 52108商品监听 V3.1（筛选+定时下单）</h1>
         <div id="statusBar" class="status-bar hidden"></div>
       </div>
 
@@ -521,6 +521,7 @@
         </div>
         <div class="checkbox-row">
           <label><input type="checkbox" id="val_onlyPresale"> 仅监听预售商品</label>
+          <label><input type="checkbox" id="val_debug"> Debug 详细日志</label>
         </div>
       </div>
 
@@ -701,17 +702,40 @@ async function fetchTotal() {
   return data.result?.totalCount || 0;
 }
 async function fetchAllItems(total) {
-  const pageSize = 50;
-  let items = [];
-  for (let skip = 0; skip < total; skip += pageSize) {
-    if (!running) break;
-    const url = buildApiUrl(skip, pageSize);
+  // 为了应对接口偶尔服务繁忙时返回异常数据的情况：
+  // 1. 一次性拉取 total+100 条，尽量覆盖这次 totalCount 附近的全部数据；
+  // 2. 再次读取 totalCount，对比本次与初始的差值，若超过 100 视为异常并重试3次。
+  let currentTotal = total;
+  let attempt = 0;
+  let lastItems = [];
+  while (attempt < 3) {
+    const safeMax = currentTotal + 100;
+    const url = buildApiUrl(0, safeMax);
     const res = await fetch(url);
     const data = await res.json();
-    items = items.concat(data.result?.items || []);
-    await new Promise(r => setTimeout(r, 200));
+    const items = data.result?.items || [];
+    lastItems = items;
+
+    // 再次获取 totalCount 做校验
+    let newTotal = 0;
+    try {
+      newTotal = await fetchTotal();
+    } catch (e) {
+      newTotal = currentTotal;
+    }
+    const diff = Math.abs(newTotal - total);
+    if (diff <= 100) {
+      // totalCount 与最初结果在 100 以内，认为正常
+      return items;
+    }
+
+    log(`⚠ 列表 totalCount 异常，初始=${total}，当前=${newTotal}，差值=${diff}，尝试重新获取 (第 ${attempt + 1} 次)...`);
+    currentTotal = newTotal;
+    attempt++;
+    await delay(500);
   }
-  return items;
+  // 多次重试依然异常，返回最后一次拿到的数据，避免死循环
+  return lastItems;
 }
 async function getRoleExtra(goodsId) {
   const t0 = Date.now();
@@ -948,9 +972,15 @@ function loadScheduledTasks() {
   if (!tasksStr) return;
   try {
     scheduledTasks = JSON.parse(tasksStr);
-    // 兼容数据：为没有新字段的任务添加默认值
+    // 兼容数据：为没有新字段的任务添加默认值，并迁移旧版“提前抢”含义到偏移量（负数=提前，正数=延后）
     scheduledTasks.forEach(task => {
-      if (task.advanceMs === undefined) task.advanceMs = 0;
+      if (task.advanceMs === undefined) {
+        task.advanceMs = 0;
+      } else if (task._offsetMigrated !== true) {
+        // 旧版本含义是“提前 N 毫秒”，现在改为“偏移量”，因此做一次性取反迁移
+        task.advanceMs = -Math.abs(task.advanceMs || 0);
+        task._offsetMigrated = true;
+      }
       if (task.customConcurrency === undefined) task.customConcurrency = BURST_CONCURRENCY;
     });
     log(`✔ 已加载 ${scheduledTasks.length} 个定时任务`);
@@ -977,8 +1007,8 @@ function updateTaskSettings(taskId) {
   if (advanceInput) {
     const advanceValue = parseInt(advanceInput.value, 10);
     const safeAdvance = isNaN(advanceValue) ? 0 : advanceValue;
-    // 限制在 0~60000 毫秒
-    task.advanceMs = Math.max(0, Math.min(60000, safeAdvance));
+    // 限制在 -60000~60000 毫秒（负数=提前，正数=延后）
+    task.advanceMs = Math.max(-60000, Math.min(60000, safeAdvance));
   }
 
   if (concurrencyInput) {
@@ -988,7 +1018,6 @@ function updateTaskSettings(taskId) {
   }
 
   saveScheduledTasks();
-  renderTaskList();
   log(`✔ 已更新任务 ${task.goodsName} 的抢购设置`);
 }
 function renderTaskList() {
@@ -1000,9 +1029,9 @@ function renderTaskList() {
   const now = Date.now();
   container.innerHTML = scheduledTasks.map(task => {
     const noticeEndTime = task.noticeEndTime;
-    // 计算实际执行时间（提前 N 毫秒）
+    // 计算实际执行时间（偏移量，负数=提前，正数=延后）
     const advanceMs = task.advanceMs || 0;
-    const executeTime = noticeEndTime - advanceMs;
+    const executeTime = noticeEndTime + advanceMs;
     const timeRemaining = executeTime - now;
     let statusClass = task.status;
     let statusText = '';
@@ -1035,15 +1064,14 @@ function renderTaskList() {
           <div style="margin-bottom: 8px; font-weight: 600; color: #333; font-size: 13px;">⚙️ 抢购设置</div>
           <div class="task-settings-grid">
             <div class="task-setting-item">
-              <label>提前抢（毫秒）</label>
+              <label>抢购偏移（毫秒，负数=提前，正数=延后）</label>
               <input 
                 type="number" 
                 id="advance_${task.id}" 
                 value="${advanceMs}" 
-                min="0" 
+                min="-60000" 
                 max="60000"
                 step="10"
-                onchange="updateTaskSettings('${task.id}')"
               />
             </div>
             <div class="task-setting-item">
@@ -1054,12 +1082,21 @@ function renderTaskList() {
                 value="${task.customConcurrency}" 
                 min="1" 
                 max="50"
-                onchange="updateTaskSettings('${task.id}')"
               />
             </div>
           </div>
-          ${advanceMs > 0 ? `<div style="margin-top: 8px; font-size: 12px; color: #666;">
-            将在公示结束前 ${advanceMs} 毫秒（${new Date(executeTime).toLocaleString()}）开始抢购
+          <div style="margin-top: 8px;">
+            <button 
+              type="button" 
+              class="btn-save" 
+              style="padding:6px 12px; font-size:12px;"
+              onclick="updateTaskSettings('${task.id}')"
+            >
+              保存抢购设置
+            </button>
+          </div>
+          ${advanceMs !== 0 ? `<div style="margin-top: 8px; font-size: 12px; color: #666;">
+            实际抢购时间：${new Date(executeTime).toLocaleString()}（相对公示结束 ${advanceMs > 0 ? '延后' : '提前'} ${Math.abs(advanceMs)} 毫秒）
           </div>` : ''}
         </div>
       `;
@@ -1067,8 +1104,8 @@ function renderTaskList() {
 
     // 显示当前设置的标记
     const settingsBadges = task.status === 'pending' 
-      ? (advanceMs > 0 || task.customConcurrency !== BURST_CONCURRENCY
-        ? `<span class="task-setting-badge">提前${advanceMs}ms</span><span class="task-setting-badge">并发${task.customConcurrency}</span>`
+      ? (advanceMs !== 0 || task.customConcurrency !== BURST_CONCURRENCY
+        ? `<span class="task-setting-badge">${advanceMs > 0 ? '延后' : '提前'}${Math.abs(advanceMs)}ms</span><span class="task-setting-badge">并发${task.customConcurrency}</span>`
         : '')
       : '';
 
@@ -1099,6 +1136,8 @@ function renderMatchedGoodsList() {
   }
   container.innerHTML = matchedGoodsList.map(m => {
     const url = `http://dms.52108.com/#/pages/shop/detail?id=${m.id}`;
+    const rechargeMark = m.recharge >= 0 ? `${m.recharge}✔` : `${m.recharge}✘`;
+    // 命中列表中的 Debug 风格日志已经在上方输出，这里主要展示数据及一键操作
     return `
       <div class="matched-item">
         <span class="matched-name">${escapeHtml(m.name)}</span>
@@ -1132,9 +1171,9 @@ async function checkScheduledTasks() {
   for (const task of scheduledTasks) {
     if (task.status !== 'pending') continue;
     
-    // 计算实际执行时间（提前 N 毫秒）
+    // 计算实际执行时间（偏移量，负数=提前，正数=延后）
     const advanceMs = task.advanceMs || 0;
-    const executeTime = task.noticeEndTime - advanceMs;
+    const executeTime = task.noticeEndTime + advanceMs;
     const timeUntil = executeTime - now;
     // 在执行时间到达时（或已过期但未超过60秒）触发下单
     if (timeUntil <= 3000 && timeUntil > -60000) {
@@ -1142,9 +1181,11 @@ async function checkScheduledTasks() {
       task.statusMessage = '下单中...';
       saveScheduledTasks();
       renderTaskList();
-      const advanceInfo = advanceMs > 0 
-        ? ` (提前${advanceMs}毫秒，并发${task.customConcurrency})` 
-        : '';
+      let advanceInfo = '';
+      if (advanceMs !== 0) {
+        const dir = advanceMs > 0 ? '延后' : '提前';
+        advanceInfo = ` (${dir}${Math.abs(advanceMs)}毫秒，并发${task.customConcurrency})`;
+      }
       log(`⏰ 定时任务到期，开始下单: ${task.goodsName} (ID=${task.goodsId})${advanceInfo}`);
       try {
         // 使用任务自定义的并发数量
@@ -1193,7 +1234,15 @@ function startTaskChecker() {
   if (taskCheckTimer) return;
   taskCheckTimer = setInterval(() => {
     checkScheduledTasks();
-    renderTaskList();
+    // 如果当前正在编辑抢购设置输入框，暂时不要重绘列表避免打字被打断
+    const active = document.activeElement;
+    const editing =
+      active &&
+      typeof active.id === 'string' &&
+      (active.id.startsWith('advance_') || active.id.startsWith('concurrency_'));
+    if (!editing) {
+      renderTaskList();
+    }
   }, 300);
   log("✔ 定时任务检查器已启动");
 }
@@ -1580,6 +1629,7 @@ window.addEventListener('beforeunload', () => {
       const settings = {
         selectedJobs: getJobList(),
         onlyPresale: document.getElementById('val_onlyPresale').checked,
+        debug: document.getElementById('val_debug').checked,
         flow: document.getElementById('val_flow').value,
         recharge: document.getElementById('val_recharge').value,
         cardDays: document.getElementById('val_cardDays').value,
@@ -1603,6 +1653,7 @@ window.addEventListener('beforeunload', () => {
         if (!s) return;
         const settings = JSON.parse(s);
         document.getElementById('val_onlyPresale').checked = !!settings.onlyPresale;
+        document.getElementById('val_debug').checked = !!settings.debug;
         if (settings.flow != null) document.getElementById('val_flow').value = settings.flow;
         if (settings.recharge != null) document.getElementById('val_recharge').value = settings.recharge;
         if (settings.cardDays != null) document.getElementById('val_cardDays').value = settings.cardDays;
@@ -1862,6 +1913,7 @@ window.addEventListener('beforeunload', () => {
       const needCardDays = parseInt(document.getElementById('val_cardDays').value, 10) || 0;
       const onlyPresale = document.getElementById('val_onlyPresale').checked;
       const threshold = getThreshold();
+      const debug = document.getElementById('val_debug').checked;
       
       log('获取 totalCount...');
       let total = 0;
@@ -1889,11 +1941,16 @@ window.addEventListener('beforeunload', () => {
       
       if (onlyPresale) {
         const now = Date.now();
+        const before = items.length;
         items = items.filter(it => {
           const end = it.noticeEndTime ? new Date(it.noticeEndTime).getTime() : 0;
-          return end > now;
+          const keep = end > now;
+          if (debug && !keep) {
+            log(`预售筛掉 ID=${it.id || '未知'}: noticeEndTime=${it.noticeEndTime || '无'}`);
+          }
+          return keep;
         });
-        log('仅预售筛选后剩余 ' + items.length + ' 条');
+        log(`仅预售筛选后剩余 ${items.length} 条（原始 ${before} 条）`);
       }
       
       log(`共 ${items.length} 个商品，开始并发详情检测（${batchSize}个/批）...`);
@@ -1904,11 +1961,42 @@ window.addEventListener('beforeunload', () => {
         if (!running) break;
         const batch = items.slice(i, i + batchSize);
         const tasks = batch.map(async (item) => {
+          const t0 = Date.now();
           const detail = await getRoleDetail(item.id);
-          if (!detail) return;
-          if (detail.recharge < needRecharge) return;
-          if (detail.cardDays < needCardDays) return;
-          if (!matchFlow(detail.flow, needFlow)) return;
+          const cost = Date.now() - t0;
+          if (!detail) {
+            if (debug) log(`过滤 ID=${item.id}: 获取详情失败`);
+            return;
+          }
+          const server = item.gameServer?.subName || '未知区服';
+          const okRecharge = detail.recharge >= needRecharge;
+          const okDays = detail.cardDays >= needCardDays;
+          const okFlow = matchFlow(detail.flow, needFlow);
+
+          if (debug) {
+            log(
+              `检测ID=${item.id} | 区服=${server} | 价格=${item.price} | 充值=${detail.recharge}${okRecharge ? '✔' : '✘'} | 月卡=${detail.cardDays}${okDays ? '✔' : '✘'} | 流派=${detail.flow || '无'}${okFlow ? '✔' : '✘'} | 耗时=${cost}ms`
+            );
+          }
+
+          if (!okRecharge) {
+            if (debug && needRecharge > 0) {
+              log(`过滤 ID=${item.id}: 充值 ${detail.recharge} < 要求 ${needRecharge}`);
+            }
+            return;
+          }
+          if (!okDays) {
+            if (debug && needCardDays > 0) {
+              log(`过滤 ID=${item.id}: 月卡天数 ${detail.cardDays} < 要求 ${needCardDays}`);
+            }
+            return;
+          }
+          if (!okFlow) {
+            if (debug && needFlow.length > 0) {
+              log(`过滤 ID=${item.id}: 流派 "${detail.flow}" 不在 ${JSON.stringify(needFlow)}`);
+            }
+            return;
+          }
           
           const val = calcValue(detail.market, detail.escort, detail.hasCard);
           if ((val + threshold) > item.price) {
@@ -1932,6 +2020,9 @@ window.addEventListener('beforeunload', () => {
               saveWorthList();
               log(`命中 ID=${hit.id} 赚${(val + threshold - item.price).toFixed(1)}`);
             }
+          } else if (debug) {
+            const earn = (val + threshold - item.price).toFixed(1);
+            log(`过滤 ID=${item.id}: 价值不够 value=${(val + threshold).toFixed(1)} 售价=${item.price} (差值=${earn})`);
           }
         });
         await Promise.all(tasks);
