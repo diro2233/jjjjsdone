@@ -345,7 +345,7 @@
     <div id="tab-home">
       <!-- 原主页内容 -->
       <div class="card">
-        <h1>🎮 52108商品监听 V3.2（筛选+定时下单）</h1>
+        <h1>🎮 52108商品监听 V3.3（筛选+定时下单）</h1>
         <div id="statusBar" class="status-bar hidden"></div>
       </div>
 
@@ -784,30 +784,45 @@ async function rushOrder(goodsId, customConcurrency) {
   let active = 0;
   let done = false;
   let finalResult = null;
+  const isSuccessResult = (r) => !!(r && r.success);
+  const isScheduledResult = (r) => !!(r && r.scheduledTask);
+  const isTerminalResult = (r) => !!(r && r.terminalError);
   const spawn = () => {
     if (done) return;
     active++;
     (async () => {
       try {
         const res = await createOrder(goodsId, 0, { fastRetry: true, maxRetryOverride: 0 });
+        // 结果优先级：success > scheduledTask > terminalError
         if (res && res.success) {
-          done = true;
+          // 一旦有成功，永远以成功为准（避免被后续失败覆盖）
           finalResult = res;
-        } else if (res && res.scheduledTask) {
           done = true;
-          finalResult = res;
-        } else {
-          const msg = JSON.stringify(res?.error?.message || res);
-          if (isTerminalOrderError(msg)) {
-            done = true;
+          return;
+        }
+        if (res && res.scheduledTask) {
+          // 仅当目前还没有成功/终止错误时，记录 scheduledTask
+          if (!isSuccessResult(finalResult) && !isTerminalResult(finalResult)) {
+            finalResult = res;
+          }
+          done = true;
+          return;
+        }
+        const msg = JSON.stringify(res?.error?.message || res);
+        if (isTerminalOrderError(msg)) {
+          // 终止错误只在尚未成功时记录；后续若有成功到来仍可覆盖
+          if (!isSuccessResult(finalResult)) {
             finalResult = { success: false, terminalError: true, message: msg };
           }
+          done = true;
         }
       } catch (e) {
         const msg = e?.message || String(e);
         if (isTerminalOrderError(msg)) {
+          if (!isSuccessResult(finalResult)) {
+            finalResult = { success: false, terminalError: true, message: msg };
+          }
           done = true;
-          finalResult = { success: false, terminalError: true, message: msg };
         }
       } finally {
         active--;
@@ -822,6 +837,15 @@ async function rushOrder(goodsId, customConcurrency) {
     }
     if (done) break;
     await delay(FAST_RETRY_DELAY);
+  }
+  // 若不是成功结果，给仍在飞的并发请求一个短暂“收尾窗口”，
+  // 防止先收到终止错误就返回，但后面其实有请求成功。
+  if (!isSuccessResult(finalResult) && active > 0) {
+    const waitUntil = Date.now() + 1500;
+    while (active > 0 && Date.now() < waitUntil) {
+      await delay(10);
+      if (isSuccessResult(finalResult)) break;
+    }
   }
   return finalResult;
 }
