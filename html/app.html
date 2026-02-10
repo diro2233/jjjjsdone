@@ -345,7 +345,7 @@
     <div id="tab-home">
       <!-- 原主页内容 -->
       <div class="card">
-        <h1>🎮 52108商品监听 V3.5（筛选+定时下单）</h1>
+        <h1>🎮 52108商品监听 V3.6（筛选+定时下单）</h1>
         <div id="statusBar" class="status-bar hidden"></div>
       </div>
 
@@ -580,6 +580,10 @@
       <div class="card">
         <label>每批并发检测 ID 数</label>
         <input type="number" id="val_batchSize" value="5" min="1" max="20" />
+        <div class="form-group" style="margin-top: 12px;">
+          <label>轮询间隔（秒，0 = 连续扫描）</label>
+          <input type="number" id="val_interval" value="0" min="0" max="3600" />
+        </div>
         <div class="btn-row">
           <button id="val_btnStart" class="btn-primary">启动监听</button>
           <button id="val_btnStop" class="btn-stop" disabled>停止</button>
@@ -1666,7 +1670,8 @@ window.addEventListener('beforeunload', () => {
         cardDays: document.getElementById('val_cardDays').value,
         batchSize: document.getElementById('val_batchSize').value,
         formulaType: getFormulaType(),
-        threshold: document.getElementById('val_threshold').value.trim()
+        threshold: document.getElementById('val_threshold').value.trim(),
+        interval: document.getElementById('val_interval').value
       };
       try {
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -1691,6 +1696,9 @@ window.addEventListener('beforeunload', () => {
         if (settings.batchSize != null) document.getElementById('val_batchSize').value = settings.batchSize;
         if (settings.threshold !== undefined && settings.threshold !== '') {
           document.getElementById('val_threshold').value = settings.threshold;
+        }
+        if (settings.interval != null) {
+          document.getElementById('val_interval').value = settings.interval;
         }
         if (settings.formulaType === '3') document.getElementById('val_formula3').checked = true;
         else if (settings.formulaType === '2') document.getElementById('val_formula2').checked = true;
@@ -2050,6 +2058,17 @@ window.addEventListener('beforeunload', () => {
               renderWorthList();
               saveWorthList();
               log(`命中 ID=${hit.id} 赚${(val + threshold - item.price).toFixed(1)}`);
+              // Bark 推送（仅对新增命中推送一次）
+              if (typeof pushBark === 'function') {
+                const totalValue = val + threshold;
+                const earn = (totalValue - item.price).toFixed(1);
+                const url = `http://dms.52108.com/#/pages/shop/detail?id=${hit.id}`;
+                await pushBark(
+                  "发现价值商品",
+                  `ID=${hit.id} 区服=${hit.server} 价格=${hit.price} 价值≈${totalValue.toFixed(1)} 预估赚${earn}`,
+                  url
+                );
+              }
             }
           } else if (debug) {
             const earn = (val + threshold - item.price).toFixed(1);
@@ -2063,12 +2082,26 @@ window.addEventListener('beforeunload', () => {
         }
       }
       
-      if (running) {
+      if (!running) {
+        // 用户在中途点击了停止
         log('本轮结束。');
         showStatus('本轮结束', 'success');
         document.getElementById('val_btnStart').disabled = false;
         document.getElementById('val_btnStop').disabled = true;
-        running = false;
+        return;
+      }
+
+      // 根据轮询间隔继续下一轮
+      const intervalSec = parseInt(document.getElementById('val_interval').value, 10) || 0;
+      log('本轮结束。');
+      if (intervalSec <= 0) {
+        log('轮询间隔=0，立即开始下一轮...');
+        timer = setTimeout(run, 0);
+      } else {
+        const nextTime = new Date(Date.now() + intervalSec * 1000);
+        log(`下次开始时间：${nextTime.toLocaleString()}`);
+        showStatus(`等待下一轮，${intervalSec} 秒后开始`, 'success');
+        timer = setTimeout(run, intervalSec * 1000);
       }
     }
     
@@ -2082,17 +2115,19 @@ window.addEventListener('beforeunload', () => {
       renderWorthList();
       saveWorthList();
       log('开始运行...');
-      run().finally(() => {
-        running = false;
-        document.getElementById('val_btnStart').disabled = false;
-        document.getElementById('val_btnStop').disabled = true;
-      });
+      run();
     };
     document.getElementById('val_btnStop').onclick = () => {
       if (!running) return;
       running = false;
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
       log('正在停止...');
       showStatus('正在停止...', 'warning');
+      document.getElementById('val_btnStart').disabled = false;
+      document.getElementById('val_btnStop').disabled = true;
     };
     loadSettings();
     loadWorthList();
