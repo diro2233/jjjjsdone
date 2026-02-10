@@ -345,7 +345,7 @@
     <div id="tab-home">
       <!-- 原主页内容 -->
       <div class="card">
-        <h1>🎮 52108商品监听 V3.1（筛选+定时下单）</h1>
+        <h1>🎮 52108商品监听 V3.2（筛选+定时下单）</h1>
         <div id="statusBar" class="status-bar hidden"></div>
       </div>
 
@@ -972,14 +972,10 @@ function loadScheduledTasks() {
   if (!tasksStr) return;
   try {
     scheduledTasks = JSON.parse(tasksStr);
-    // 兼容数据：为没有新字段的任务添加默认值，并迁移旧版“提前抢”含义到偏移量（负数=提前，正数=延后）
+    // 兼容数据：为没有新字段的任务添加默认值
     scheduledTasks.forEach(task => {
-      if (task.advanceMs === undefined) {
+      if (task.advanceMs === undefined || task.advanceMs === null) {
         task.advanceMs = 0;
-      } else if (task._offsetMigrated !== true) {
-        // 旧版本含义是“提前 N 毫秒”，现在改为“偏移量”，因此做一次性取反迁移
-        task.advanceMs = -Math.abs(task.advanceMs || 0);
-        task._offsetMigrated = true;
       }
       if (task.customConcurrency === undefined) task.customConcurrency = BURST_CONCURRENCY;
     });
@@ -1005,19 +1001,29 @@ function updateTaskSettings(taskId) {
   const concurrencyInput = document.getElementById(`concurrency_${taskId}`);
 
   if (advanceInput) {
-    const advanceValue = parseInt(advanceInput.value, 10);
-    const safeAdvance = isNaN(advanceValue) ? 0 : advanceValue;
-    // 限制在 -60000~60000 毫秒（负数=提前，正数=延后）
-    task.advanceMs = Math.max(-60000, Math.min(60000, safeAdvance));
+    const raw = advanceInput.value.trim();
+    if (raw !== '') {
+      const advanceValue = parseInt(raw, 10);
+      if (!isNaN(advanceValue)) {
+        // 限制在 -60000~60000 毫秒（负数=提前，正数=延后）
+        task.advanceMs = Math.max(-60000, Math.min(60000, advanceValue));
+      }
+    }
   }
 
   if (concurrencyInput) {
-    const concurrencyValue = parseInt(concurrencyInput.value, 10);
-    const safeConcurrency = isNaN(concurrencyValue) ? BURST_CONCURRENCY : concurrencyValue;
-    task.customConcurrency = Math.max(1, Math.min(50, safeConcurrency));
+    const raw = concurrencyInput.value.trim();
+    if (raw !== '') {
+      const concurrencyValue = parseInt(raw, 10);
+      if (!isNaN(concurrencyValue)) {
+        const safeConcurrency = concurrencyValue;
+        task.customConcurrency = Math.max(1, Math.min(50, safeConcurrency));
+      }
+    }
   }
 
   saveScheduledTasks();
+  renderTaskList();
   log(`✔ 已更新任务 ${task.goodsName} 的抢购设置`);
 }
 function renderTaskList() {
