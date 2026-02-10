@@ -503,9 +503,9 @@
       </div>
     </div>
 
-    <!-- Tab 内容: 扫价值 (价值筛选) -->
+  
     <div id="tab-scan" class="hidden">
-      <!-- 原扫价值内容 (ID 已加前缀 val_) -->
+    
       <div class="card">
         <h1>筛选价值商品</h1>
         <div id="val_statusBar" class="status-bar hidden"></div>
@@ -626,7 +626,7 @@
     }
   </script>
 
-  <!-- 主页逻辑 JS（已内联自 2026-52-108.js） -->
+
   <script>
 let timer = null;
 let seen = new Set();
@@ -640,7 +640,7 @@ const FAST_RETRY_DELAY = 0;
 const BURST_MS = 2000;
 const BURST_CONCURRENCY = 12;
 const SUSTAIN_CONCURRENCY = 6;
-// 新增：定时任务管理
+// 定时任务管理
 let scheduledTasks = [];
 let taskCheckTimer = null;
 // 命中商品列表（用于页面底部展示）
@@ -929,7 +929,7 @@ async function createScheduledTask(goodsId, errorMessage) {
     statusMessage: '',
     createTime: Date.now(),
     orderNumber: null,
-    // 新增：提前抢和并发设置（默认值）
+    // 提前抢和并发设置（默认值）
     advanceMs: 0,
     customConcurrency: BURST_CONCURRENCY
   };
@@ -948,7 +948,7 @@ function loadScheduledTasks() {
   if (!tasksStr) return;
   try {
     scheduledTasks = JSON.parse(tasksStr);
-    // 兼容旧数据：为没有新字段的任务添加默认值
+    // 兼容数据：为没有新字段的任务添加默认值
     scheduledTasks.forEach(task => {
       if (task.advanceMs === undefined) task.advanceMs = 0;
       if (task.customConcurrency === undefined) task.customConcurrency = BURST_CONCURRENCY;
@@ -966,7 +966,7 @@ function deleteTask(taskId) {
   renderTaskList();
   log(`已删除任务 ${taskId}`);
 }
-// 新增：更新任务的提前抢和并发设置
+// 更新任务的提前抢和并发设置
 function updateTaskSettings(taskId) {
   const task = scheduledTasks.find(t => t.id === taskId);
   if (!task) return;
@@ -1534,7 +1534,7 @@ window.addEventListener('beforeunload', () => {
 });
   </script>
 
-  <!-- 嵌入扫价值逻辑 JS (已修正公式三计算) -->
+  <!--  (修正公式三计算) -->
   <script>
   (function() {
     const API_LIST = 'https://api.52108.com/api/services/cbg/Goods/GetIndexGoodsPaged';
@@ -1688,7 +1688,7 @@ window.addEventListener('beforeunload', () => {
       return flows.some(f => target.includes(f));
     }
     
-    // 修正后的公式三计算函数
+    // 修正公式三计算函数
     function calcValue(market, escort, hasCard) {
       const formula = getFormulaType();
       let base = 0;
@@ -1755,6 +1755,24 @@ window.addEventListener('beforeunload', () => {
         const noticeText = hasNotice
           ? `${escapeHtml(w.noticeEndTimeStr || '')}（本地：${w.noticeEndTime ? new Date(w.noticeEndTime).toLocaleString() : '未知'}）`
           : '无';
+
+        // 是否预售：有公示结束时间且晚于当前时间
+        const isPresale = !!(w.noticeEndTime && w.noticeEndTime > Date.now());
+        const primaryBtnHtml = isPresale
+          ? `<button 
+              type="button"
+              onclick="valAddToSchedule(${w.id})"
+              style="padding:4px 8px; background:#28a745; color:#fff; border:none; border-radius:4px; font-size:12px; cursor:pointer;"
+            >
+              添加定时任务
+            </button>`
+          : `<button 
+              type="button"
+              onclick="oneClickOrder(${w.id})"
+              style="padding:4px 8px; background:#ff6a00; color:#fff; border:none; border-radius:4px; font-size:12px; cursor:pointer;"
+            >
+              一键下单
+            </button>`;
         
         return `<div class="matched-item">
           <div class="worth-earn">能赚约 ${earn.toFixed(1)} 元</div>
@@ -1771,13 +1789,7 @@ window.addEventListener('beforeunload', () => {
           <span class="matched-meta">${valueDisplay} &gt; 售价 ${w.price} ✓</span>
           <span class="matched-meta" style="color: #888; font-size: 11px;">${calcDetail}</span>
           <div style="margin-left:auto; display:flex; gap:6px;">
-            <button 
-              type="button"
-              onclick="valAddToSchedule(${w.id})"
-              style="padding:4px 8px; background:#28a745; color:#fff; border:none; border-radius:4px; font-size:12px; cursor:pointer;"
-            >
-              添加定时任务
-            </button>
+            ${primaryBtnHtml}
             <button 
               type="button"
               onclick="valRemoveWorthItem(${w.id})"
