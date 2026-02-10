@@ -1,0 +1,1989 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>52108 商品监听 & 价值筛选合集</title>
+  <style>    
+    * { box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      margin: 0; 
+      padding: 20px; 
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .card { 
+      background: white; 
+      padding: 24px; 
+      border-radius: 16px; 
+      margin-bottom: 20px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12); 
+    }
+    h1 { 
+      text-align: center; 
+      margin: 0 0 24px 0;
+      color: #333;
+      font-size: 24px;
+      font-weight: 600;
+    }
+    h2 { 
+      margin: 0 0 16px 0; 
+      font-size: 18px; 
+      font-weight: 600;
+      color: #333;
+      padding-bottom: 8px; 
+      border-bottom: 2px solid #ff6a00; 
+    }
+    label { 
+      display: block; 
+      margin-top: 12px; 
+      margin-bottom: 6px;
+      font-weight: 500; 
+      color: #555;
+      font-size: 14px;
+    }
+    input, select { 
+      width: 100%; 
+      padding: 10px 12px; 
+      border-radius: 8px; 
+      border: 1px solid #ddd; 
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #ff6a00;
+      box-shadow: 0 0 0 3px rgba(255, 106, 0, 0.1);
+    }
+    button { 
+      padding: 10px 20px; 
+      border-radius: 8px; 
+      border: none; 
+      font-size: 14px; 
+      font-weight: 500;
+      cursor: pointer; 
+      transition: all 0.2s;
+    }
+    button:hover { 
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    button:disabled {
+      transform: none;
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+    .btn-primary { background: #ff6a00; color: white; }
+    .btn-primary:hover { background: #e55a00; }
+    .btn-stop { background: #6c757d; color: white; }
+    .btn-stop:hover { background: #5a6268; }
+    .btn-save { background: #28a745; color: white; }
+    .btn-save:hover { background: #218838; }
+    .btn-secondary { background: #6c757d; color: white; }
+    .btn-secondary:hover { background: #5a6268; }
+    .btn-row { 
+      display: flex; 
+      gap: 10px; 
+      margin-top: 16px;
+    }
+    .btn-row button {
+      flex: 1;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+    }
+    .checkbox-group { 
+      display: grid; 
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); 
+      gap: 8px; 
+      margin-top: 8px; 
+    }
+    .checkbox-group label, .checkbox-row label { 
+      font-weight: normal; 
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .checkbox-group label:hover, .checkbox-row label:hover {
+      background: #f5f5f5;
+    }
+    .checkbox-group input[type="checkbox"], .checkbox-row input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+      cursor: pointer;
+    }
+    .checkbox-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .hidden { display: none; }
+    a { color: #4da3ff; text-decoration: underline; }
+    .status-bar { 
+      padding: 12px 16px; 
+      border-radius: 8px; 
+      font-size: 14px;
+      margin-bottom: 20px;
+      font-weight: 500;
+    }
+    .status-bar.success { background: #d4edda; color: #155724; border-left: 4px solid #28a745; }
+    .status-bar.error { background: #f8d7da; color: #721c24; border-left: 4px solid #dc3545; }
+    .status-bar.warning { background: #fff3cd; color: #856404; border-left: 4px solid #ffc107; }
+    .status-bar.processing { background: #d1ecf1; color: #0c5460; border-left: 4px solid #17a2b8; }
+    .log { 
+      background: #1e1e1e; 
+      color: #0f0; 
+      padding: 16px; 
+      height: 300px; 
+      overflow: auto; 
+      font-size: 12px; 
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      line-height: 1.6;
+    }
+    .log::-webkit-scrollbar { width: 8px; }
+    .log::-webkit-scrollbar-track { background: #2a2a2a; }
+    .log::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+    .log::-webkit-scrollbar-thumb:hover { background: #777; }
+
+    /* 定时任务列表样式 (主页特有) */
+    .task-list { margin-top: 12px; }
+    .task-item { 
+      background: #f8f9fa; 
+      padding: 16px; 
+      margin-bottom: 12px; 
+      border-radius: 8px; 
+      border-left: 4px solid #ff6a00; 
+      position: relative;
+      transition: box-shadow 0.2s;
+    }
+    .task-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .task-item.pending { border-left-color: #2196F3; }
+    .task-item.processing { border-left-color: #ff9800; background: #fff8e1; }
+    .task-item.success { border-left-color: #4CAF50; background: #e8f5e9; }
+    .task-item.expired { border-left-color: #999; background: #f5f5f5; opacity: 0.7; }
+    .task-item.error { border-left-color: #f44336; background: #ffebee; }
+    .task-info { font-size: 13px; line-height: 1.8; }
+    .task-info strong { color: #333; font-size: 14px; }
+    .task-status { 
+      display: inline-block; 
+      padding: 4px 10px; 
+      border-radius: 4px; 
+      font-size: 11px; 
+      margin-left: 8px; 
+      font-weight: 500;
+    }
+    .task-status.pending { background: #e3f2fd; color: #1976d2; }
+    .task-status.processing { background: #ffe0b2; color: #e65100; }
+    .task-status.success { background: #c8e6c9; color: #388e3c; }
+    .task-status.expired { background: #e0e0e0; color: #757575; }
+    .task-status.error { background: #ffcdd2; color: #c62828; }
+    .task-delete { 
+      position: absolute; 
+      top: 12px; 
+      right: 12px; 
+      background: #dc3545; 
+      color: white; 
+      border: none; 
+      padding: 6px 12px; 
+      border-radius: 6px; 
+      cursor: pointer; 
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .task-delete:hover { background: #c82333; opacity: 1; }
+    .task-countdown { color: #ff6a00; font-weight: bold; }
+    .no-tasks { text-align: center; color: #999; padding: 40px 20px; font-size: 14px; }
+
+    /* 任务设置区域样式 */
+    .task-settings {
+      margin-top: 12px;
+      padding: 12px;
+      background: #fff;
+      border-radius: 6px;
+      border: 1px solid #e0e0e0;
+    }
+    .task-settings-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .task-setting-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .task-setting-item label {
+      font-size: 12px;
+      margin-bottom: 4px;
+      color: #666;
+    }
+    .task-setting-item input {
+      padding: 6px 8px;
+      font-size: 13px;
+    }
+    .task-setting-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      background: #e3f2fd;
+      color: #1976d2;
+      border-radius: 4px;
+      font-size: 11px;
+      margin-left: 6px;
+      font-weight: 500;
+    }
+
+    /* 命中商品列表 (通用) */
+    .matched-goods-list { margin-top: 8px; max-height: 400px; overflow-y: auto; }
+    .matched-goods-list::-webkit-scrollbar { width: 8px; }
+    .matched-goods-list::-webkit-scrollbar-track { background: #f0f0f0; border-radius: 4px; }
+    .matched-goods-list::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+    .matched-item {
+      display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+      padding: 12px; margin-bottom: 8px; background: #f8f9fa; border-radius: 8px;
+      border-left: 4px solid #28a745; font-size: 13px;
+    }
+    .matched-item .matched-name { font-weight: 600; color: #333; min-width: 100px; }
+    .matched-item .matched-meta { color: #666; }
+    .matched-item a { color: #4da3ff; text-decoration: underline; }
+    .matched-item a:hover { text-decoration: none; }
+    .no-matched { text-align: center; color: #999; padding: 24px; font-size: 14px; }
+
+    /* 扫价值特有样式 */
+    .matched-item .worth-earn {
+      font-size: 18px; font-weight: 700; color: #28a745; margin-right: 12px;
+      flex-basis: 100%; margin-bottom: 4px;
+    }
+    .formula-options { margin-top: 8px; }
+    .formula-option {
+      display: grid; grid-template-columns: auto 1fr; gap: 12px 16px;
+      align-items: start; margin-bottom: 12px; padding: 12px 14px;
+      border-radius: 8px; background: #f8f9fa;
+    }
+    .formula-option input[type="radio"] { margin: 3px 0 0 0; cursor: pointer; }
+    .formula-desc { font-size: 14px; line-height: 1.7; color: #333; }
+    .formula-desc strong { display: inline-block; margin-right: 6px; }
+    .formula-desc .line { display: block; margin-top: 2px; }
+    .formula-threshold { margin-top: 12px; }
+    .formula-threshold label { margin-bottom: 4px; }
+    .formula-threshold input { max-width: 120px; }
+
+    /* Tab 样式 */
+    .tab-nav {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 6px;
+      border-radius: 12px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      background: transparent;
+      color: white;
+      font-weight: 600;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      opacity: 0.8;
+    }
+    .tab-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      opacity: 1;
+    }
+    .tab-btn.active {
+      background: white;
+      color: #ff6a00;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      opacity: 1;
+    }
+    
+    @media (max-width: 768px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .btn-row { flex-direction: column; }
+      .checkbox-group { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- 顶部标题 -->
+    <div class="card" style="text-align: center; padding: 20px;">
+      <h1 style="margin: 0;">🛠️ 52108 工具箱</h1>
+    </div>
+
+    <!-- Tab 导航 -->
+    <div class="tab-nav">
+      <button class="tab-btn active" onclick="switchTab('home')">🎮 定时下单 & 监听</button>
+      <button class="tab-btn" onclick="switchTab('scan')">💎 价值商品筛选</button>
+    </div>
+
+    <!-- Tab 内容: 主页 (定时下单 & 监听) -->
+    <div id="tab-home">
+      <!-- 原主页内容 -->
+      <div class="card">
+        <h1>🎮 52108商品监听 V3.0（定时下单）</h1>
+        <div id="statusBar" class="status-bar hidden"></div>
+      </div>
+
+      <div class="card">
+        <h2>📋 基础筛选设置</h2>
+        <div class="form-group">
+          <label>商品类型</label>
+          <select id="type" onchange="onTypeChange()">
+            <option value="99">角色</option>
+            <option value="1">装备</option>
+            <option value="2">消耗品</option>
+            <option value="3">有限品</option>
+            <option value="4">材料</option>
+            <option value="5">杂货</option>
+            <option value="6">打捆道具</option>
+          </select>
+        </div>
+
+        <div id="jobBox" class="form-group">
+          <label>职业筛选</label>
+          <div class="checkbox-group">
+            <label><input type="checkbox" class="job-checkbox" value="1"> 战士</label>
+            <label><input type="checkbox" class="job-checkbox" value="2"> 法师</label>
+            <label><input type="checkbox" class="job-checkbox" value="3"> 术士</label>
+          </div>
+        </div>
+
+        <div id="equipBox" class="form-group hidden">
+          <label>装备部位</label>
+          <div class="checkbox-group">
+            <label><input type="checkbox" class="equip-checkbox" value="1"> 武器</label>
+            <label><input type="checkbox" class="equip-checkbox" value="2"> 头盔</label>
+            <label><input type="checkbox" class="equip-checkbox" value="3"> 护腕</label>
+            <label><input type="checkbox" class="equip-checkbox" value="6"> 衣服</label>
+            <label><input type="checkbox" class="equip-checkbox" value="9"> 符咒</label>
+            <label><input type="checkbox" class="equip-checkbox" value="8"> 鞋子</label>
+            <label><input type="checkbox" class="equip-checkbox" value="5"> 腰带</label>
+            <label><input type="checkbox" class="equip-checkbox" value="4"> 项链</label>
+            <label><input type="checkbox" class="equip-checkbox" value="7"> 戒指</label>
+            <label><input type="checkbox" class="equip-checkbox" value="10"> 勋章</label>
+            <label><input type="checkbox" class="equip-checkbox" value="11"> 宝石</label>
+            <label><input type="checkbox" class="equip-checkbox" value="12"> 翅膀</label>
+            <label><input type="checkbox" class="equip-checkbox" value="15"> 法宝</label>
+            <label><input type="checkbox" class="equip-checkbox" value="14"> 坐骑</label>
+            <label><input type="checkbox" class="equip-checkbox" value="13"> 盾牌</label>
+            <label><input type="checkbox" class="equip-checkbox" value="16"> 时装</label>
+            <label><input type="checkbox" class="equip-checkbox" value="17"> 斗笠</label>
+            <label><input type="checkbox" class="equip-checkbox" value="33"> 其他</label>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label>最低价格</label>
+            <input id="priceStart" type="number" value="1" />
+          </div>
+          <div class="form-group">
+            <label>最高价格</label>
+            <input id="priceEnd" type="number" value="99" />
+          </div>
+          <div class="form-group">
+            <label>月卡剩余天数 ≥</label>
+            <input id="cardDays" type="number" value="0" />
+          </div>
+          <div class="form-group">
+            <label>充值金额 ≥</label>
+            <input id="recharge" type="number" value="0" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>流派筛选（支持多个）</label>
+          <input id="flow" placeholder="例如：道玄,鬼王 青云(不填则不筛选)" />
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>🔐 账号设置</h2>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>账号</label>
+            <input id="username" placeholder="请输入账号" />
+          </div>
+          <div class="form-group">
+            <label>密码</label>
+            <input id="password" type="password" placeholder="请输入密码" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>手动下单商品ID</label>
+          <div class="form-grid" style="grid-template-columns: 1fr auto;">
+            <input id="manualGoodsId" placeholder="输入商品ID" />
+            <button onclick="manualCreateOrder()" class="btn-secondary" style="margin-top: 0;">手动下单</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>⚙️ 监听设置</h2>
+        <div class="checkbox-row">
+          <label><input type="checkbox" id="debug" /> Debug详细日志</label>
+          <label><input type="checkbox" id="barkJump" /> Bark 推送可点击跳转商品页</label>
+          <label><input type="checkbox" id="autoOrder" /> 命中后自动下单 + Bark</label>
+        </div>
+
+        <div class="form-group">
+          <label>Bark Key</label>
+          <input id="bark" placeholder="https://api.day.app/你的key" />
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label>轮询间隔（秒）</label>
+            <input id="interval" type="number" value="1800" />
+          </div>
+          <div class="form-group">
+            <label>每批并发检测ID数</label>
+            <input id="batchSize" type="number" value="5" />
+          </div>
+          <div class="form-group">
+            <label>登录失败重试次数</label>
+            <input id="loginRetry" type="number" value="3" />
+          </div>
+          <div class="form-group">
+            <label>下单失败重试次数</label>
+            <input id="orderRetry" type="number" value="3" />
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button onclick="startMonitor()" class="btn-primary">▶️ 开始监听</button>
+          <button class="btn-stop" onclick="stopMonitor()">⏹️ 停止</button>
+          <button class="btn-save" onclick="saveSettings()">💾 保存设置</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>⏰ 定时下单任务列表</h2>
+        <div id="taskList" class="task-list">
+          <div class="no-tasks">暂无定时任务</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📝 运行日志</h2>
+        <div class="log" id="log"></div>
+      </div>
+
+      <div class="card">
+        <h2>🎯 命中商品列表</h2>
+        <div id="matchedGoodsList" class="matched-goods-list">
+          <div class="no-matched">暂无命中记录，开始监听后命中会显示在此</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 内容: 扫价值 (价值筛选) -->
+    <div id="tab-scan" class="hidden">
+      <!-- 原扫价值内容 (ID 已加前缀 val_) -->
+      <div class="card">
+        <h1>筛选价值商品</h1>
+        <div id="val_statusBar" class="status-bar hidden"></div>
+      </div>
+
+      <div class="card">
+        <h2>基础筛选</h2>
+        <label>职业（可多选）</label>
+        <div class="checkbox-group">
+          <label><input type="checkbox" class="val-job-cb" value="1"> 战士</label>
+          <label><input type="checkbox" class="val-job-cb" value="2"> 法师</label>
+          <label><input type="checkbox" class="val-job-cb" value="3"> 术士</label>
+        </div>
+        <div class="checkbox-row">
+          <label><input type="checkbox" id="val_onlyPresale"> 仅监听预售商品</label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>进阶筛选（留空则不筛）</h2>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>流派筛选（多个用逗号/空格分隔）</label>
+            <input type="text" id="val_flow" placeholder="例如：天忍 道玄 青云" />
+          </div>
+          <div class="form-group">
+            <label>充值金额 ≥</label>
+            <input type="number" id="val_recharge" value="0" min="0" placeholder="0" />
+          </div>
+          <div class="form-group">
+            <label>月卡剩余天数 ≥</label>
+            <input type="number" id="val_cardDays" value="0" min="0" placeholder="0" />
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>价值公式</h2>
+        <div class="formula-options">
+          <label class="formula-option">
+            <input type="radio" name="formula" value="1" id="val_formula1" checked>
+            <span class="formula-desc">
+              <strong>公式一</strong>
+              <span class="line">有月卡：(商行 + 押镖) / 300 &gt; 售价</span>
+              <span class="line">无月卡：(商行 + 押镖) / 300 - 30 &gt; 售价</span>
+            </span>
+          </label>
+          <label class="formula-option">
+            <input type="radio" name="formula" value="2" id="val_formula2">
+            <span class="formula-desc">
+              <strong>公式二</strong>
+              <span class="line">有月卡：商行 / 300 &gt; 售价</span>
+              <span class="line">无月卡：商行 / 300 - 30 &gt; 售价</span>
+            </span>
+          </label>
+          <label class="formula-option">
+            <input type="radio" name="formula" value="3" id="val_formula3">
+            <span class="formula-desc">
+              <strong>公式三</strong>
+              <span class="line">有月卡：(商行 / 300 + 押镖 / 300 × 0.66) &gt; 售价</span>
+              <span class="line">无月卡：(商行 / 300 + 押镖 / 300 × 0.66) - 30 &gt; 售价</span>
+            </span>
+          </label>
+        </div>
+        <div class="formula-threshold">
+          <label>阈值（留空=0，填 -30 即价值-30，填 20 即价值+20）</label>
+          <input type="number" id="val_threshold" placeholder="例如 -30 或 20" step="1" />
+        </div>
+      </div>
+
+      <div class="card">
+        <label>每批并发检测 ID 数</label>
+        <input type="number" id="val_batchSize" value="5" min="1" max="20" />
+        <div class="btn-row">
+          <button id="val_btnStart" class="btn-primary">启动监听</button>
+          <button id="val_btnStop" class="btn-stop" disabled>停止</button>
+          <button id="val_btnSave" class="btn-save">保存设置</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+          <h2 style="margin-bottom: 0;">值得列表</h2>
+          <button 
+            type="button"
+            class="btn-stop" 
+            style="padding: 6px 12px; font-size: 12px;" 
+            onclick="valClearWorthList()"
+          >
+            清空列表
+          </button>
+        </div>
+        <div id="val_worthList" class="matched-goods-list">
+          <div class="no-matched">暂无，满足价值公式的商品会显示在这里</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>运行日志</h2>
+        <div class="log" id="val_log"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Tab 切换逻辑
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      event.currentTarget.classList.add('active');
+
+      if (tab === 'home') {
+        document.getElementById('tab-home').classList.remove('hidden');
+        document.getElementById('tab-scan').classList.add('hidden');
+      } else {
+        document.getElementById('tab-home').classList.add('hidden');
+        document.getElementById('tab-scan').classList.remove('hidden');
+      }
+    }
+  </script>
+
+  <!-- 主页逻辑 JS（已内联自 2026-52-108.js） -->
+  <script>
+let timer = null;
+let seen = new Set();
+let running = false;
+// Token 管理
+let token = "";
+let tokenExpireTime = 0;
+// 重试配置
+const RETRY_DELAYS = [1000, 3000, 5000];
+const FAST_RETRY_DELAY = 0;
+const BURST_MS = 2000;
+const BURST_CONCURRENCY = 12;
+const SUSTAIN_CONCURRENCY = 6;
+// 新增：定时任务管理
+let scheduledTasks = [];
+let taskCheckTimer = null;
+// 命中商品列表（用于页面底部展示）
+let matchedGoodsList = [];
+function log(msg) {
+  const el = document.getElementById("log");
+  const timestamp = new Date().toLocaleTimeString();
+  el.innerHTML += `[${timestamp}] ${msg}<br>`;
+  el.scrollTop = el.scrollHeight;
+}
+function showStatus(msg, type = 'success') {
+  const statusBar = document.getElementById('statusBar');
+  statusBar.textContent = msg;
+  statusBar.className = 'status-bar';
+  if (type === 'error') statusBar.classList.add('error');
+  if (type === 'warning') statusBar.classList.add('warning');
+  statusBar.classList.remove('hidden');
+}
+function onTypeChange() {
+  const type = document.getElementById("type").value;
+  document.getElementById("jobBox").classList.toggle("hidden", type !== "99");
+  document.getElementById("equipBox").classList.toggle("hidden", type !== "1");
+}
+function getCheckedJobs() {
+  return Array.from(document.querySelectorAll('.job-checkbox:checked'))
+    .map(i => i.value)
+    .join(",");
+}
+function getCheckedEquipments() {
+  return Array.from(document.querySelectorAll('.equip-checkbox:checked'))
+    .map(i => i.value)
+    .join(",");
+}
+function buildApiUrl(skip, maxCount) {
+  const type = typeEl.value;
+  const priceStart = priceStartEl.value;
+  const priceEnd = priceEndEl.value;
+  const timestamp = Date.now();
+  let url = `https://api.52108.com/api/services/cbg/Goods/GetIndexGoodsPaged?GameServerId=&TypeList=&PriceStart=${priceStart}&PriceEnd=${priceEnd}&EquipmentTypeList=&Id=&Name=&Sorting=&SkipCount=${skip}&MaxResultCount=${maxCount}&OnlyPlayed=false&time=${timestamp}&type=${type}`;
+  if (type === "99") {
+    const jobList = getCheckedJobs();
+    if (jobList) {
+      url += `&RoleJobList=${encodeURIComponent(jobList)}`;
+    }
+  }
+  if (type === "1") {
+    const equipList = getCheckedEquipments();
+    if (equipList) {
+      url = url.replace('EquipmentTypeList=', `EquipmentTypeList=${encodeURIComponent(equipList)}`);
+    }
+  }
+  return url;
+}
+async function fetchTotal() {
+  const url = buildApiUrl(0, 1);
+  const res = await fetch(url);
+  const data = await res.json();
+  return data.result?.totalCount || 0;
+}
+async function fetchAllItems(total) {
+  const pageSize = 50;
+  let items = [];
+  for (let skip = 0; skip < total; skip += pageSize) {
+    if (!running) break;
+    const url = buildApiUrl(skip, pageSize);
+    const res = await fetch(url);
+    const data = await res.json();
+    items = items.concat(data.result?.items || []);
+    await new Promise(r => setTimeout(r, 200));
+  }
+  return items;
+}
+async function getRoleExtra(goodsId) {
+  const t0 = Date.now();
+  const res = await fetch(`https://api.52108.com/api/services/app/GameRoleInfo/GetGameRoleInfo?GoodsId=${goodsId}`);
+  const j = await res.json();
+  const html = j.result[0].data;
+  const cardMatch = html.match(/月卡到期时间：.*?val'>(.*?)</);
+  let days = 0;
+  if (cardMatch && cardMatch[1] !== "无月卡") {
+    days = Math.floor((new Date(cardMatch[1]) - new Date()) / 86400000);
+  }
+  const flowMatch = html.match(/流派：.*?val'>(.*?)</);
+  const flow = flowMatch ? flowMatch[1] : "";
+  const rechargeMatch = html.match(/充值：.*?val'>(\d+)</);
+  const recharge = rechargeMatch ? Number(rechargeMatch[1]) : 0;
+  const cost = Date.now() - t0;
+  return { days, flow, recharge, cost };
+}
+function parseFlows(text) {
+  if (!text) return [];
+  return text.split(/[,\s、，]+/).map(s => s.trim()).filter(Boolean);
+}
+function matchFlow(target, flows) {
+  if (flows.length === 0) return true;
+  return flows.some(f => target.includes(f));
+}
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+function isTerminalOrderError(message) {
+  if (!message) return false;
+  const msg = String(message);
+  return (
+    msg.includes("当前商品交易中") ||
+    msg.includes("已售") ||
+    msg.includes("不存在") ||
+    msg.includes("下架") ||
+    msg.includes("库存不足") ||
+    msg.includes("不可购买")
+  );
+}
+async function rushOrder(goodsId, customConcurrency) {
+  const burstConcurrency = customConcurrency || BURST_CONCURRENCY;
+  const start = Date.now();
+  const burstEnd = start + BURST_MS;
+  let active = 0;
+  let done = false;
+  let finalResult = null;
+  const spawn = () => {
+    if (done) return;
+    active++;
+    (async () => {
+      try {
+        const res = await createOrder(goodsId, 0, { fastRetry: true, maxRetryOverride: 0 });
+        if (res && res.success) {
+          done = true;
+          finalResult = res;
+        } else if (res && res.scheduledTask) {
+          done = true;
+          finalResult = res;
+        } else {
+          const msg = JSON.stringify(res?.error?.message || res);
+          if (isTerminalOrderError(msg)) {
+            done = true;
+            finalResult = { success: false, terminalError: true, message: msg };
+          }
+        }
+      } catch (e) {
+        const msg = e?.message || String(e);
+        if (isTerminalOrderError(msg)) {
+          done = true;
+          finalResult = { success: false, terminalError: true, message: msg };
+        }
+      } finally {
+        active--;
+      }
+    })();
+  };
+  while (!done) {
+    const now = Date.now();
+    const targetConcurrency = now <= burstEnd ? burstConcurrency : SUSTAIN_CONCURRENCY;
+    while (!done && active < targetConcurrency) {
+      spawn();
+    }
+    if (done) break;
+    await delay(FAST_RETRY_DELAY);
+  }
+  return finalResult;
+}
+function saveToken(accessToken) {
+  token = accessToken;
+  tokenExpireTime = Date.now() + 23 * 60 * 60 * 1000;
+  const tokenData = {
+    token: accessToken,
+    expireTime: tokenExpireTime,
+    username: usernameEl.value.trim()
+  };
+  localStorage.setItem("barkMonitorToken", JSON.stringify(tokenData));
+  log("✔ Token 已保存到本地存储");
+}
+function loadToken() {
+  const tokenStr = localStorage.getItem("barkMonitorToken");
+  if (!tokenStr) return false;
+  try {
+    const tokenData = JSON.parse(tokenStr);
+    if (tokenData.expireTime && tokenData.expireTime > Date.now()) {
+      if (tokenData.username === usernameEl.value.trim()) {
+        token = tokenData.token;
+        tokenExpireTime = tokenData.expireTime;
+        const remainHours = Math.floor((tokenExpireTime - Date.now()) / 3600000);
+        log(`✔ 已加载本地 Token（剩余有效期约 ${remainHours} 小时）`);
+        showStatus(`Token 有效，剩余 ${remainHours} 小时`, 'success');
+        return true;
+      } else {
+        log("本地 Token 用户名不匹配，需重新登录");
+      }
+    } else {
+      log("本地 Token 已过期，需重新登录");
+    }
+  } catch (e) {
+    log("加载本地 Token 失败: " + e.message);
+  }
+  localStorage.removeItem("barkMonitorToken");
+  token = "";
+  tokenExpireTime = 0;
+  return false;
+}
+function isTokenExpiringSoon() {
+  if (!token || !tokenExpireTime) return true;
+  return (tokenExpireTime - Date.now()) < 60 * 60 * 1000;
+}
+async function login(user, pass, retryCount = 0) {
+  const maxRetry = Number(loginRetryEl.value) || 3;
+  try {
+    log(`正在登录... (尝试 ${retryCount + 1}/${maxRetry + 1})`);
+    showStatus(`登录中... (尝试 ${retryCount + 1}/${maxRetry + 1})`, 'warning');
+    const res = await fetch("https://api.52108.com/api/TokenAuth/AccountAuthenticate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userName: user, password: pass })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      throw new Error(data.error?.message || "登录失败");
+    }
+    saveToken(data.result.accessToken);
+    log("✔ 登录成功");
+    showStatus("登录成功", 'success');
+    return true;
+  } catch (e) {
+    log(`✘ 登录失败: ${e.message}`);
+    if (retryCount < maxRetry) {
+      const delayMs = RETRY_DELAYS[retryCount] || 5000;
+      log(`${delayMs / 1000} 秒后重试登录...`);
+      await delay(delayMs);
+      return login(user, pass, retryCount + 1);
+    } else {
+      log(`✘ 登录失败，已达最大重试次数 (${maxRetry + 1})`);
+      showStatus(`登录失败: ${e.message}`, 'error');
+      throw new Error("登录失败: " + e.message);
+    }
+  }
+}
+async function ensureLogin() {
+  const user = usernameEl.value.trim();
+  const pass = passwordEl.value.trim();
+  if (!user || !pass) {
+    throw new Error("请填写账号和密码");
+  }
+  if (token && !isTokenExpiringSoon()) {
+    return true;
+  }
+  if (!token && loadToken()) {
+    return true;
+  }
+  log("Token 无效或即将过期，正在重新登录...");
+  return await login(user, pass);
+}
+async function getGoodsDetail(goodsId) {
+  try {
+    const res = await fetch(`https://api.52108.com/api/services/cbg/Goods/GetById?id=${goodsId}`);
+    const data = await res.json();
+    if (data.success && data.result) {
+      return data.result;
+    }
+    return null;
+  } catch (e) {
+    log(`查询商品详情失败 ID=${goodsId}: ${e.message}`);
+    return null;
+  }
+}
+async function createScheduledTask(goodsId, errorMessage) {
+  const existing = scheduledTasks.find(t => t.goodsId === goodsId);
+  if (existing) {
+    log(`⏰ 商品ID=${goodsId} 已有定时任务，不再重复创建`);
+    return existing;
+  }
+  log(`⏰ 检测到公示期限制，正在查询商品详情...`);
+  const goodsDetail = await getGoodsDetail(goodsId);
+  if (!goodsDetail || !goodsDetail.noticeEndTime) {
+    log(`✘ 无法获取商品 ID=${goodsId} 的公示结束时间`);
+    return;
+  }
+  const noticeEndTime = new Date(goodsDetail.noticeEndTime);
+  const taskId = `task_${goodsId}_${Date.now()}`;
+  const task = {
+    id: taskId,
+    goodsId: goodsId,
+    goodsName: goodsDetail.name || `商品${goodsId}`,
+    server: goodsDetail.gameServer?.subName || "未知区服",
+    price: goodsDetail.price,
+    noticeEndTime: noticeEndTime.getTime(),
+    noticeEndTimeStr: goodsDetail.noticeEndTime,
+    status: 'pending',
+    statusMessage: '',
+    createTime: Date.now(),
+    orderNumber: null,
+    // 新增：提前抢和并发设置（默认值）
+    advanceMs: 0,
+    customConcurrency: BURST_CONCURRENCY
+  };
+  scheduledTasks.push(task);
+  saveScheduledTasks();
+  renderTaskList();
+  log(`✔ 已创建定时任务: ${task.goodsName} | ${task.server} | ${task.price}元 | 将在 ${noticeEndTime.toLocaleString()} 自动下单`);
+  await pushBark("创建定时下单任务", `${task.goodsName} | ${task.server} | ${task.price}元 | ${noticeEndTime.toLocaleString()}`, `http://dms.52108.com/#/pages/shop/detail?id=${goodsId}`);
+  return task;
+}
+function saveScheduledTasks() {
+  localStorage.setItem("scheduledTasks", JSON.stringify(scheduledTasks));
+}
+function loadScheduledTasks() {
+  const tasksStr = localStorage.getItem("scheduledTasks");
+  if (!tasksStr) return;
+  try {
+    scheduledTasks = JSON.parse(tasksStr);
+    // 兼容旧数据：为没有新字段的任务添加默认值
+    scheduledTasks.forEach(task => {
+      if (task.advanceMs === undefined) task.advanceMs = 0;
+      if (task.customConcurrency === undefined) task.customConcurrency = BURST_CONCURRENCY;
+    });
+    log(`✔ 已加载 ${scheduledTasks.length} 个定时任务`);
+    renderTaskList();
+  } catch (e) {
+    log("加载定时任务失败: " + e.message);
+    scheduledTasks = [];
+  }
+}
+function deleteTask(taskId) {
+  scheduledTasks = scheduledTasks.filter(t => t.id !== taskId);
+  saveScheduledTasks();
+  renderTaskList();
+  log(`已删除任务 ${taskId}`);
+}
+// 新增：更新任务的提前抢和并发设置
+function updateTaskSettings(taskId) {
+  const task = scheduledTasks.find(t => t.id === taskId);
+  if (!task) return;
+
+  const advanceInput = document.getElementById(`advance_${taskId}`);
+  const concurrencyInput = document.getElementById(`concurrency_${taskId}`);
+
+  if (advanceInput) {
+    const advanceValue = parseInt(advanceInput.value, 10);
+    const safeAdvance = isNaN(advanceValue) ? 0 : advanceValue;
+    // 限制在 0~60000 毫秒
+    task.advanceMs = Math.max(0, Math.min(60000, safeAdvance));
+  }
+
+  if (concurrencyInput) {
+    const concurrencyValue = parseInt(concurrencyInput.value, 10);
+    const safeConcurrency = isNaN(concurrencyValue) ? BURST_CONCURRENCY : concurrencyValue;
+    task.customConcurrency = Math.max(1, Math.min(50, safeConcurrency));
+  }
+
+  saveScheduledTasks();
+  renderTaskList();
+  log(`✔ 已更新任务 ${task.goodsName} 的抢购设置`);
+}
+function renderTaskList() {
+  const container = document.getElementById('taskList');
+  if (scheduledTasks.length === 0) {
+    container.innerHTML = '<div class="no-tasks">暂无定时任务</div>';
+    return;
+  }
+  const now = Date.now();
+  container.innerHTML = scheduledTasks.map(task => {
+    const noticeEndTime = task.noticeEndTime;
+    // 计算实际执行时间（提前 N 毫秒）
+    const advanceMs = task.advanceMs || 0;
+    const executeTime = noticeEndTime - advanceMs;
+    const timeRemaining = executeTime - now;
+    let statusClass = task.status;
+    let statusText = '';
+    let countdown = '';
+    if (task.status === 'success') {
+      const paymentLink = task.orderId 
+        ? ` | <a href="${getPaymentUrl(task.orderId)}" target="_blank" style="color: #ff6a00; font-weight: bold;">点击去付款</a>`
+        : '';
+      statusText = `下单成功 订单号:${task.orderNumber}${paymentLink}`;
+    } else if (task.status === 'error') {
+      statusText = `下单失败: ${task.statusMessage}`;
+    } else if (task.status === 'processing') {
+      statusText = '下单中...';
+    } else if (timeRemaining < 0) {
+      statusText = '已过期';
+      statusClass = 'expired';
+    } else {
+      statusText = '等待中';
+      const hours = Math.floor(timeRemaining / 3600000);
+      const minutes = Math.floor((timeRemaining % 3600000) / 60000);
+      const seconds = Math.floor((timeRemaining % 60000) / 1000);
+      countdown = `<span class="task-countdown">倒计时: ${hours}h ${minutes}m ${seconds}s</span>`;
+    }
+
+    // 构建设置区域（仅在等待中状态显示）
+    let settingsHtml = '';
+    if (task.status === 'pending') {
+      settingsHtml = `
+        <div class="task-settings">
+          <div style="margin-bottom: 8px; font-weight: 600; color: #333; font-size: 13px;">⚙️ 抢购设置</div>
+          <div class="task-settings-grid">
+            <div class="task-setting-item">
+              <label>提前抢（毫秒）</label>
+              <input 
+                type="number" 
+                id="advance_${task.id}" 
+                value="${advanceMs}" 
+                min="0" 
+                max="60000"
+                step="10"
+                onchange="updateTaskSettings('${task.id}')"
+              />
+            </div>
+            <div class="task-setting-item">
+              <label>并发数量</label>
+              <input 
+                type="number" 
+                id="concurrency_${task.id}" 
+                value="${task.customConcurrency}" 
+                min="1" 
+                max="50"
+                onchange="updateTaskSettings('${task.id}')"
+              />
+            </div>
+          </div>
+          ${advanceMs > 0 ? `<div style="margin-top: 8px; font-size: 12px; color: #666;">
+            将在公示结束前 ${advanceMs} 毫秒（${new Date(executeTime).toLocaleString()}）开始抢购
+          </div>` : ''}
+        </div>
+      `;
+    }
+
+    // 显示当前设置的标记
+    const settingsBadges = task.status === 'pending' 
+      ? (advanceMs > 0 || task.customConcurrency !== BURST_CONCURRENCY
+        ? `<span class="task-setting-badge">提前${advanceMs}ms</span><span class="task-setting-badge">并发${task.customConcurrency}</span>`
+        : '')
+      : '';
+
+    return `
+      <div class="task-item ${statusClass}">
+        <button class="task-delete" onclick="deleteTask('${task.id}')">删除</button>
+        <div class="task-info">
+          <div>
+            <strong>${task.goodsName}</strong>
+            <span class="task-status ${statusClass}">${statusText}</span>
+            ${settingsBadges}
+          </div>
+          <div>商品ID: <a href="http://dms.52108.com/#/pages/shop/detail?id=${task.goodsId}" target="_blank" style="color: #4da3ff; text-decoration: underline;">${task.goodsId}</a> | 区服: ${task.server} | 价格: ${task.price}元</div>
+          <div>公示结束时间: ${new Date(noticeEndTime).toLocaleString()}（原始: ${escapeHtml(task.noticeEndTimeStr || '')}）</div>
+          ${countdown ? `<div>${countdown}</div>` : ''}
+        </div>
+        ${settingsHtml}
+      </div>
+    `;
+  }).join('');
+}
+function renderMatchedGoodsList() {
+  const container = document.getElementById('matchedGoodsList');
+  if (!container) return;
+  if (matchedGoodsList.length === 0) {
+    container.innerHTML = '<div class="no-matched">暂无命中记录，开始监听后命中会显示在此</div>';
+    return;
+  }
+  container.innerHTML = matchedGoodsList.map(m => {
+    const url = `http://dms.52108.com/#/pages/shop/detail?id=${m.id}`;
+    return `
+      <div class="matched-item">
+        <span class="matched-name">${escapeHtml(m.name)}</span>
+        <span class="matched-meta">ID: <a href="${url}" target="_blank">${m.id}</a></span>
+        <span class="matched-meta">区服: ${escapeHtml(m.server)}</span>
+        <span class="matched-meta">价格: ${m.price}元</span>
+        <span class="matched-meta">充值: ${m.recharge}</span>
+        <span class="matched-meta">月卡: ${m.days}天</span>
+        <span class="matched-meta">流派: ${escapeHtml(m.flow)}</span>
+        <span class="matched-meta">${m.hitTime}</span>
+        <button 
+          type="button"
+          class="btn-primary"
+          style="margin-left:auto; padding:4px 10px; font-size:12px;"
+          onclick="oneClickOrder(${m.id})"
+        >
+          一键下单
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+function escapeHtml(str) {
+  if (str == null) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+async function checkScheduledTasks() {
+  const now = Date.now();
+  for (const task of scheduledTasks) {
+    if (task.status !== 'pending') continue;
+    
+    // 计算实际执行时间（提前 N 毫秒）
+    const advanceMs = task.advanceMs || 0;
+    const executeTime = task.noticeEndTime - advanceMs;
+    const timeUntil = executeTime - now;
+    // 在执行时间到达时（或已过期但未超过60秒）触发下单
+    if (timeUntil <= 3000 && timeUntil > -60000) {
+      task.status = 'processing';
+      task.statusMessage = '下单中...';
+      saveScheduledTasks();
+      renderTaskList();
+      const advanceInfo = advanceMs > 0 
+        ? ` (提前${advanceMs}毫秒，并发${task.customConcurrency})` 
+        : '';
+      log(`⏰ 定时任务到期，开始下单: ${task.goodsName} (ID=${task.goodsId})${advanceInfo}`);
+      try {
+        // 使用任务自定义的并发数量
+        const orderRes = await rushOrder(task.goodsId, task.customConcurrency);
+        if (orderRes && orderRes.success) {
+          const orderId = orderRes.result.id;
+          const orderNumber = orderRes.result.orderNumber;
+          const paymentUrl = getPaymentUrl(orderId);
+          const paymentLink = `<a href="${paymentUrl}" target="_blank">点击去付款</a>`;
+          task.status = 'success';
+          task.orderId = orderId;
+          task.orderNumber = orderNumber;
+          task.statusMessage = '下单成功';
+          log(`✔ 定时任务下单成功 订单号=${orderNumber} | ${paymentLink}`);
+          await pushBark("定时下单成功", `${task.goodsName} | 订单号:${orderNumber} | 点击去付款`, paymentUrl);
+        } else if (orderRes && orderRes.scheduledTask) {
+          task.status = 'pending';
+          task.statusMessage = '公示期限制';
+          log(`⏰ 仍在公示期，继续等待: ID=${task.goodsId}`);
+        } else if (orderRes && orderRes.terminalError) {
+          task.status = 'error';
+          task.statusMessage = orderRes.message;
+          log(`✘ 定时任务下单失败: ${orderRes.message}`);
+        } else {
+          task.status = 'error';
+          task.statusMessage = '下单失败';
+          log(`✘ 定时任务下单失败: 未知错误`);
+        }
+      } catch (e) {
+        task.status = 'error';
+        task.statusMessage = e.message;
+        log(`✘ 定时任务下单异常: ${e.message}`);
+      }
+      saveScheduledTasks();
+      renderTaskList();
+      return;
+    } else if (timeUntil < -60000) {
+      task.status = 'expired';
+      task.statusMessage = '任务已过期';
+      saveScheduledTasks();
+      renderTaskList();
+    }
+  }
+}
+function startTaskChecker() {
+  if (taskCheckTimer) return;
+  taskCheckTimer = setInterval(() => {
+    checkScheduledTasks();
+    renderTaskList();
+  }, 300);
+  log("✔ 定时任务检查器已启动");
+}
+function stopTaskChecker() {
+  if (taskCheckTimer) {
+    clearInterval(taskCheckTimer);
+    taskCheckTimer = null;
+  }
+}
+async function createOrder(goodsId, retryCount = 0, options = {}) {
+  const maxRetry = Number.isInteger(options.maxRetryOverride)
+    ? options.maxRetryOverride
+    : (Number(orderRetryEl.value) || 3);
+  const fastRetry = options.fastRetry === true;
+  try {
+    await ensureLogin();
+    log(`正在生成订单 ID=${goodsId}... (尝试 ${retryCount + 1}/${maxRetry + 1})`);
+    const t0 = Date.now();
+    const res = await fetch("https://api.52108.com/api/services/cbg/Order/Create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + token
+      },
+      body: JSON.stringify({ goodsId: Number(goodsId) })
+    });
+    const t1 = Date.now();
+    log(`⏱ 下单请求耗时 ${t1 - t0} ms (HTTP ${res.status}) ID=${goodsId}`);
+    if (res.status === 401) {
+      log("⚠ 检测到 401 未授权，Token 已失效");
+      localStorage.removeItem("barkMonitorToken");
+      token = "";
+      tokenExpireTime = 0;
+      if (retryCount < maxRetry) {
+        log("正在重新登录...");
+        await ensureLogin();
+        return createOrder(goodsId, retryCount + 1, options);
+      } else {
+        throw new Error("401 未授权，Token 失效");
+      }
+    }
+    const data = await res.json();
+    if (!data.success && data.error?.code === 1011) {
+      log(`⚠ ${data.error.message}`);
+      await createScheduledTask(goodsId, data.error.message);
+      return { success: false, scheduledTask: true, error: data.error };
+    }
+    if (!data.success) {
+      throw new Error(data.error?.message || JSON.stringify(data));
+    }
+    return data;
+  } catch (e) {
+    if (e.message && e.message.includes("公示期")) {
+      log(`⚠ 检测到公示期限制: ${e.message}`);
+      await createScheduledTask(goodsId, e.message);
+      return { success: false, scheduledTask: true, error: { message: e.message } };
+    }
+    log(`✘ 下单失败 (尝试 ${retryCount + 1}/${maxRetry + 1}): ${e.message}`);
+    if (retryCount < maxRetry) {
+      const delayMs = fastRetry ? FAST_RETRY_DELAY : (RETRY_DELAYS[retryCount] || 5000);
+      if (!fastRetry) {
+        log(`${delayMs / 1000} 秒后重试下单...`);
+      }
+      if (delayMs > 0) {
+        await delay(delayMs);
+      }
+      return createOrder(goodsId, retryCount + 1, options);
+    } else {
+      log(`✘ 下单失败，已达最大重试次数 (${maxRetry + 1})`);
+      throw e;
+    }
+  }
+}
+async function manualCreateOrder() {
+  const gid = manualGoodsIdEl.value.trim();
+  if (!gid) {
+    log("请输入要下单的 goodsId");
+    return;
+  }
+  try {
+    const res = await createOrder(gid);
+    if (res.success) {
+      const orderId = res.result.id;
+      const orderNumber = res.result.orderNumber;
+      const paymentUrl = getPaymentUrl(orderId);
+      const paymentLink = `<a href="${paymentUrl}" target="_blank">点击去付款</a>`;
+      log(`✔ 手动下单成功 订单号=${orderNumber} | ${paymentLink}`);
+      showStatus(`手动下单成功 订单号=${orderNumber}`, 'success');
+      await pushBark("手动下单成功", `订单号:${orderNumber} | 点击去付款`, paymentUrl);
+    } else if (res.scheduledTask) {
+      log(`⏰ 检测到公示期，已创建定时任务`);
+      showStatus("已创建定时任务，将自动下单", 'warning');
+    } else {
+      log("✘ 手动下单失败:\n" + JSON.stringify(res, null, 2));
+      showStatus("手动下单失败", 'error');
+    }
+  } catch (e) {
+    log("手动下单异常: " + e.message);
+    showStatus("手动下单异常: " + e.message, 'error');
+  }
+}
+// 命中商品列表中的“一键下单”
+function oneClickOrder(goodsId) {
+  manualGoodsIdEl.value = goodsId;
+  manualCreateOrder();
+}
+function getPaymentUrl(orderId) {
+  return `http://dms.52108.com/#/pages/trade/detail?id=${orderId}`;
+}
+async function pushBark(title, body, url) {
+  const bark = barkEl.value.trim();
+  if (!bark) return;
+  const soundParam = "sound=update";
+  const api = barkJumpEl.checked && url
+    ? `${bark}/${encodeURIComponent(title)}/${encodeURIComponent(body)}?url=${encodeURIComponent(url)}&${soundParam}`
+    : `${bark}/${encodeURIComponent(title)}/${encodeURIComponent(body)}?${soundParam}`;
+  try {
+    await fetch(api);
+    log("✔ Bark 推送成功");
+  } catch (e) {
+    log("✘ Bark 推送失败: " + e.message);
+  }
+}
+async function check() {
+  if (!running) return;
+  try {
+    const total = await fetchTotal();
+    const type = typeEl.value;
+    let filterInfo = `价格${priceStartEl.value}-${priceEndEl.value}`;
+    if (type === "99") {
+      const jobs = getCheckedJobs();
+      if (jobs) filterInfo += ` | 职业=${jobs}`;
+    }
+    if (type === "1") {
+      const equips = getCheckedEquipments();
+      if (equips) filterInfo += ` | 装备=${equips}`;
+    }
+    log(`当前市场基础筛选总数：${total} (${filterInfo})`);
+    if (total === 0) return;
+    const items = await fetchAllItems(total);
+    const needDays = Number(cardDaysEl.value);
+    const needRecharge = Number(rechargeEl.value);
+    const needFlows = parseFlows(flowEl.value.trim());
+    const debug = debugEl.checked;
+    let matchCount = 0;
+    const batchSize = Math.max(1, Number(batchSizeEl.value) || 1);
+    for (let i = 0; i < items.length; i += batchSize) {
+      if (!running) return;
+      const batch = items.slice(i, i + batchSize);
+      const results = await Promise.all(batch.map(async (item) => {
+        try {
+          const extra = await getRoleExtra(item.id);
+          const server = item.gameServer?.subName || "未知区服";
+          const okDays = extra.days >= needDays;
+          const okRecharge = extra.recharge >= needRecharge;
+          const okFlow = matchFlow(extra.flow, needFlows);
+          if (debug) {
+            log(`检测ID=${item.id} | 区服=${server} | 价格=${item.price} | 充值=${extra.recharge}${okRecharge ? "✔" : "✘"} | 月卡=${extra.days}${okDays ? "✔" : "✘"} | 流派=${extra.flow}${okFlow ? "✔" : "✘"} | 耗时=${extra.cost}ms`);
+          }
+          if (!okDays || !okRecharge || !okFlow) return null;
+          if (seen.has(item.id)) return null;
+          return { item, extra, server };
+        } catch (e) {
+          log(`检测商品 ID=${item.id} 时出错: ${e.message}`);
+          return null;
+        }
+      }));
+      for (const r of results) {
+        if (!r) continue;
+        seen.add(r.item.id);
+        matchCount++;
+        matchedGoodsList.unshift({
+          id: r.item.id,
+          name: r.item.name || `商品${r.item.id}`,
+          server: r.server,
+          price: r.item.price,
+          recharge: r.extra.recharge,
+          days: r.extra.days,
+          flow: r.extra.flow,
+          hitTime: new Date().toLocaleString()
+        });
+        renderMatchedGoodsList();
+        const url = `http://dms.52108.com/#/pages/shop/detail?id=${r.item.id}`;
+        const msg = `<a href="${url}" target="_blank">命中ID=${r.item.id} 区服=${r.server} 价格=${r.item.price} 充值=${r.extra.recharge} 月卡=${r.extra.days} 流派=${r.extra.flow}</a>`;
+        log(msg);
+        if (autoOrderEl.checked) {
+          try {
+            const orderRes = await createOrder(r.item.id);
+            if (orderRes.success) {
+              const orderId = orderRes.result.id;
+              const orderNumber = orderRes.result.orderNumber;
+              const paymentUrl = getPaymentUrl(orderId);
+              const paymentLink = `<a href="${paymentUrl}" target="_blank">点击去付款</a>`;
+              log(`✔ 已自动下单 订单号=${orderNumber} | ${paymentLink}`);
+              showStatus(`自动下单成功 ID=${r.item.id}`, 'success');
+              await pushBark("自动下单成功", `ID=${r.item.id} 订单号:${orderNumber} | 点击去付款`, paymentUrl);
+            } else if (orderRes.scheduledTask) {
+              log(`⏰ 检测到公示期，已创建定时任务 ID=${r.item.id}`);
+              showStatus(`已创建定时任务 ID=${r.item.id}`, 'warning');
+            } else {
+              log(`✘ 自动下单失败: ${JSON.stringify(orderRes)}`);
+            }
+          } catch (e) {
+            log("自动下单异常: " + e.message);
+          }
+        } else {
+          await pushBark("发现符合条件商品", `ID=${r.item.id} 区服=${r.server} 价格=${r.item.price} 充值=${r.extra.recharge} 月卡=${r.extra.days} 流派=${r.extra.flow}`, url);
+        }
+      }
+    }
+    log(`本轮命中 ${matchCount} 个 | 累计推送 ${seen.size} 个`);
+    showStatus(`运行中 - 本轮命中 ${matchCount} 个`, 'success');
+    const intervalSec = Number(intervalEl.value);
+    if (intervalSec === 0) {
+      log("轮询间隔=0，立即开始下一轮...");
+      setTimeout(check, 0);
+    } else {
+      const nextTime = new Date(Date.now() + intervalSec * 1000);
+      log(`下次开始时间：${nextTime.toLocaleString()}`);
+    }
+  } catch (e) {
+    log("错误: " + e.message);
+    showStatus("检测出错: " + e.message, 'error');
+    if (running) {
+      log("10 秒后继续监听...");
+      await delay(10000);
+    }
+  }
+}
+function startMonitor() {
+  stopMonitor();
+  running = true;
+  const interval = Number(intervalEl.value) * 1000;
+  log("开始监听...");
+  showStatus("监听已启动", 'success');
+  loadToken();
+  startTaskChecker();
+  check();
+  timer = setInterval(check, interval);
+}
+function stopMonitor() {
+  running = false;
+  if (timer) clearInterval(timer);
+  timer = null;
+  log("已停止监听");
+  showStatus("监听已停止", 'warning');
+}
+function saveSettings() {
+  const settings = {
+    priceStart: priceStartEl.value,
+    priceEnd: priceEndEl.value,
+    cardDays: cardDaysEl.value,
+    recharge: rechargeEl.value,
+    flow: flowEl.value,
+    bark: barkEl.value,
+    barkJump: barkJumpEl.checked,
+    interval: intervalEl.value,
+    debug: debugEl.checked,
+    username: usernameEl.value,
+    password: passwordEl.value,
+    autoOrder: autoOrderEl.checked,
+    loginRetry: loginRetryEl.value,
+    orderRetry: orderRetryEl.value,
+    batchSize: batchSizeEl.value,
+    selectedJobs: getCheckedJobs(),
+    selectedEquips: getCheckedEquipments(),
+    type: typeEl.value
+  };
+  localStorage.setItem("barkMonitorSettings", JSON.stringify(settings));
+  log("设置已保存");
+  showStatus("设置已保存", 'success');
+}
+function loadSettings() {
+  const s = localStorage.getItem("barkMonitorSettings");
+  if (!s) return;
+  const settings = JSON.parse(s);
+  priceStartEl.value = settings.priceStart;
+  priceEndEl.value = settings.priceEnd;
+  cardDaysEl.value = settings.cardDays;
+  rechargeEl.value = settings.recharge || 0;
+  flowEl.value = settings.flow || "";
+  barkEl.value = settings.bark;
+  barkJumpEl.checked = settings.barkJump;
+  intervalEl.value = settings.interval;
+  debugEl.checked = settings.debug || false;
+  usernameEl.value = settings.username || "";
+  passwordEl.value = settings.password || "";
+  autoOrderEl.checked = settings.autoOrder || false;
+  loginRetryEl.value = settings.loginRetry || 3;
+  orderRetryEl.value = settings.orderRetry || 3;
+  batchSizeEl.value = settings.batchSize || 5;
+  if (settings.type) {
+    typeEl.value = settings.type;
+  }
+  if (settings.selectedJobs) {
+    const jobs = settings.selectedJobs.split(',');
+    document.querySelectorAll('.job-checkbox').forEach(cb => {
+      cb.checked = jobs.includes(cb.value);
+    });
+  }
+  if (settings.selectedEquips) {
+    const equips = settings.selectedEquips.split(',');
+    document.querySelectorAll('.equip-checkbox').forEach(cb => {
+      cb.checked = equips.includes(cb.value);
+    });
+  }
+  log("已加载保存的设置");
+}
+const typeEl = document.getElementById("type");
+const priceStartEl = document.getElementById("priceStart");
+const priceEndEl = document.getElementById("priceEnd");
+const cardDaysEl = document.getElementById("cardDays");
+const rechargeEl = document.getElementById("recharge");
+const flowEl = document.getElementById("flow");
+const barkEl = document.getElementById("bark");
+const barkJumpEl = document.getElementById("barkJump");
+const intervalEl = document.getElementById("interval");
+const autoOrderEl = document.getElementById("autoOrder");
+const usernameEl = document.getElementById("username");
+const passwordEl = document.getElementById("password");
+const manualGoodsIdEl = document.getElementById("manualGoodsId");
+const debugEl = document.getElementById("debug");
+const batchSizeEl = document.getElementById("batchSize");
+const loginRetryEl = document.getElementById("loginRetry");
+const orderRetryEl = document.getElementById("orderRetry");
+loadSettings();
+onTypeChange();
+window.addEventListener('load', () => {
+  loadToken();
+  loadScheduledTasks();
+  startTaskChecker();
+});
+window.addEventListener('beforeunload', () => {
+  if (running) {
+    saveSettings();
+  }
+  stopTaskChecker();
+});
+  </script>
+
+  <!-- 嵌入扫价值逻辑 JS (已修正公式三计算) -->
+  <script>
+  (function() {
+    const API_LIST = 'https://api.52108.com/api/services/cbg/Goods/GetIndexGoodsPaged';
+    const API_ROLE = 'https://api.52108.com/api/services/app/GameRoleInfo/GetGameRoleInfo';
+    const SETTINGS_KEY = 'val_valueFilterSettings';
+    const WORTH_KEY = 'val_worthListData';
+    let running = false;
+    let worthList = [];
+    let timer = null;
+    
+    function log(msg) {
+      const el = document.getElementById('val_log');
+      const ts = new Date().toLocaleTimeString();
+      el.innerHTML += `[${ts}] ${msg}<br>`;
+      el.scrollTop = el.scrollHeight;
+    }
+    
+    function showStatus(msg, type = 'success') {
+      const bar = document.getElementById('val_statusBar');
+      bar.textContent = msg;
+      bar.className = `status-bar ${type}`;
+      bar.classList.remove('hidden');
+    }
+    
+    function getJobList() {
+      return Array.from(document.querySelectorAll('.val-job-cb:checked')).map(cb => cb.value).join(',');
+    }
+    
+    function getFormulaType() {
+      if (document.getElementById('val_formula3').checked) return '3';
+      if (document.getElementById('val_formula2').checked) return '2';
+      return '1';
+    }
+    
+    function getThreshold() {
+      const v = document.getElementById('val_threshold').value.trim();
+      if (v === '') return 0;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    }
+    
+    function saveSettings() {
+      const settings = {
+        selectedJobs: getJobList(),
+        onlyPresale: document.getElementById('val_onlyPresale').checked,
+        flow: document.getElementById('val_flow').value,
+        recharge: document.getElementById('val_recharge').value,
+        cardDays: document.getElementById('val_cardDays').value,
+        batchSize: document.getElementById('val_batchSize').value,
+        formulaType: getFormulaType(),
+        threshold: document.getElementById('val_threshold').value.trim()
+      };
+      try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+        log('设置已保存');
+        showStatus('设置已保存', 'success');
+      } catch (e) {
+        log('保存设置失败: ' + e.message);
+        showStatus('保存设置失败', 'error');
+      }
+    }
+    
+    function loadSettings() {
+      try {
+        const s = localStorage.getItem(SETTINGS_KEY);
+        if (!s) return;
+        const settings = JSON.parse(s);
+        document.getElementById('val_onlyPresale').checked = !!settings.onlyPresale;
+        if (settings.flow != null) document.getElementById('val_flow').value = settings.flow;
+        if (settings.recharge != null) document.getElementById('val_recharge').value = settings.recharge;
+        if (settings.cardDays != null) document.getElementById('val_cardDays').value = settings.cardDays;
+        if (settings.batchSize != null) document.getElementById('val_batchSize').value = settings.batchSize;
+        if (settings.threshold !== undefined && settings.threshold !== '') {
+          document.getElementById('val_threshold').value = settings.threshold;
+        }
+        if (settings.formulaType === '3') document.getElementById('val_formula3').checked = true;
+        else if (settings.formulaType === '2') document.getElementById('val_formula2').checked = true;
+        else document.getElementById('val_formula1').checked = true;
+        if (settings.selectedJobs) {
+          const jobs = settings.selectedJobs.split(',').filter(Boolean);
+          document.querySelectorAll('.val-job-cb').forEach(cb => {
+            cb.checked = jobs.includes(cb.value);
+          });
+        }
+        log('已加载保存的设置');
+      } catch (e) {
+        log('加载设置失败: ' + (e.message || e));
+      }
+    }
+    
+    function buildListUrl(skip, maxCount) {
+      const t = Date.now();
+      const jobList = getJobList();
+      // 价格区间改为跟随主页的“最低价格 / 最高价格”设置
+      const priceStartInput = document.getElementById('priceStart');
+      const priceEndInput = document.getElementById('priceEnd');
+      const priceStart = priceStartInput && priceStartInput.value !== '' ? Number(priceStartInput.value) : 1;
+      const priceEnd = priceEndInput && priceEndInput.value !== '' ? Number(priceEndInput.value) : 999999;
+
+      let url = `${API_LIST}?GameServerId=&TypeList=&PriceStart=${priceStart}&PriceEnd=${priceEnd}&EquipmentTypeList=&Id=&Name=&Sorting=&SkipCount=${skip}&MaxResultCount=${maxCount}&OnlyPlayed=false&time=${t}&type=99`;
+      if (jobList) url += '&RoleJobList=' + encodeURIComponent(jobList);
+      return url;
+    }
+    
+    async function fetchTotalCount() {
+      const res = await fetch(buildListUrl(0, 1));
+      const data = await res.json();
+      return data?.result?.totalCount ?? 0;
+    }
+    
+    async function fetchAllItems(totalCount) {
+      const res = await fetch(buildListUrl(0, totalCount));
+      const data = await res.json();
+      return data?.result?.items ?? [];
+    }
+    
+    function parseRoleDetail(html) {
+      const numFromVal = (key) => {
+        const m = html.match(new RegExp(`${key}：.*?val'>(.*?)<`));
+        if (!m || !m[1]) return null;
+        const s = m[1].replace(/元宝|,/g, '').trim();
+        const n = Number(s);
+        return Number.isFinite(n) ? n : null;
+      };
+      const market = numFromVal('商行剩余额度');
+      const escort = numFromVal('押镖剩余返利');
+      const cardMatch = html.match(/月卡到期时间：.*?val'>(.*?)</);
+      const cardExpireText = cardMatch ? cardMatch[1].trim() : '';
+      const hasCard = !!cardExpireText && cardExpireText !== '无月卡';
+      const flowMatch = html.match(/流派：.*?val'>(.*?)</);
+      const flow = flowMatch ? flowMatch[1].trim() : '';
+      const rechargeMatch = html.match(/充值：.*?val'>(\d+)/);
+      const recharge = rechargeMatch ? parseInt(rechargeMatch[1], 10) : 0;
+      let cardDays = 0;
+      if (hasCard) {
+        const expire = new Date(cardExpireText).getTime();
+        if (Number.isFinite(expire)) {
+          cardDays = Math.max(0, Math.floor((expire - Date.now()) / 86400000));
+        }
+      }
+      return { market, escort, hasCard, flow, recharge, cardDays };
+    }
+    
+    function parseFlows(text) {
+      if (!text) return [];
+      return text.split(/[\s,，、]+/).map(s => s.trim()).filter(Boolean);
+    }
+    
+    function matchFlow(target, flows) {
+      if (!flows.length) return true;
+      return flows.some(f => target.includes(f));
+    }
+    
+    // 修正后的公式三计算函数
+    function calcValue(market, escort, hasCard) {
+      const formula = getFormulaType();
+      let base = 0;
+      
+      if (formula === '2') {
+        // 公式二：只看商行
+        base = market != null ? market / 300 : 0;
+      } else if (formula === '3') {
+        // 公式三：商行全额 + 押镖打66折
+        const marketPart = market != null ? market / 300 : 0;
+        const escortPart = escort != null ? (escort / 300) * 0.66 : 0;
+        base = marketPart + escortPart;
+      } else {
+        // 公式一：商行 + 押镖全额
+        base = ((market != null ? market : 0) + (escort != null ? escort : 0)) / 300;
+      }
+      
+      return hasCard ? base : (base - 30);
+    }
+    
+    function escapeHtml(str) {
+      if (str == null) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+    
+    function renderWorthList() {
+      const el = document.getElementById('val_worthList');
+      if (!el) return;
+      if (!worthList.length) {
+        el.innerHTML = '<div class="no-matched">暂无，满足价值公式的商品会显示在这里</div>';
+        return;
+      }
+      const threshold = getThreshold();
+      const thresholdStr = threshold === 0 ? '' : (threshold > 0 ? `+${threshold}` : String(threshold));
+      const formulaType = getFormulaType();
+      
+      el.innerHTML = worthList.map(w => {
+        const url = `http://dms.52108.com/#/pages/shop/detail?id=${w.id}`;
+        const rawValue = calcValue(w.market, w.escort, w.hasCard);
+        const value = rawValue + threshold;
+        const earn = Math.max(0, value - w.price);
+        
+        // 添加详细计算过程
+        let calcDetail = '';
+        if (formulaType === '3') {
+          const marketPart = w.market != null ? w.market / 300 : 0;
+          const escortPart = w.escort != null ? (w.escort / 300) * 0.66 : 0;
+          calcDetail = `(商行${w.market}/300=${marketPart.toFixed(1)} + 押镖${w.escort}/300×0.66=${escortPart.toFixed(1)})`;
+          if (!w.hasCard) calcDetail += ' - 30';
+          calcDetail += ` = ${rawValue.toFixed(1)}`;
+        } else if (formulaType === '2') {
+          calcDetail = `商行${w.market}/300=${rawValue.toFixed(1)}`;
+        } else {
+          calcDetail = `(商行${w.market}+押镖${w.escort})/300=${rawValue.toFixed(1)}`;
+        }
+        
+        const valueDisplay = thresholdStr
+          ? `价值≈${rawValue.toFixed(1)}${thresholdStr}=${value.toFixed(1)}`
+          : `价值≈${value.toFixed(1)}`;
+
+        const hasNotice = w.noticeEndTime || w.noticeEndTimeStr;
+        const noticeText = hasNotice
+          ? `${escapeHtml(w.noticeEndTimeStr || '')}（本地：${w.noticeEndTime ? new Date(w.noticeEndTime).toLocaleString() : '未知'}）`
+          : '无';
+        
+        return `<div class="matched-item">
+          <div class="worth-earn">能赚约 ${earn.toFixed(1)} 元</div>
+          <div class="matched-name"><a href="${url}" target="_blank">${escapeHtml(w.name)}</a></div>
+          <span class="matched-meta">ID: <a href="${url}" target="_blank">${w.id}</a></span>
+          <span class="matched-meta">区服: ${escapeHtml(w.server)}</span>
+          <span class="matched-meta">售价: ${w.price} 元</span>
+          <span class="matched-meta">商行: ${w.market}</span>
+          <span class="matched-meta">押镖: ${w.escort}</span>
+          <span class="matched-meta">${w.hasCard ? '有月卡' : '无月卡'}</span>
+          <span class="matched-meta">流派: ${escapeHtml(w.flow)}</span>
+          <span class="matched-meta">充值: ${w.recharge}</span>
+          <span class="matched-meta">公示结束: ${noticeText}</span>
+          <span class="matched-meta">${valueDisplay} &gt; 售价 ${w.price} ✓</span>
+          <span class="matched-meta" style="color: #888; font-size: 11px;">${calcDetail}</span>
+          <div style="margin-left:auto; display:flex; gap:6px;">
+            <button 
+              type="button"
+              onclick="valAddToSchedule(${w.id})"
+              style="padding:4px 8px; background:#28a745; color:#fff; border:none; border-radius:4px; font-size:12px; cursor:pointer;"
+            >
+              添加定时任务
+            </button>
+            <button 
+              type="button"
+              onclick="valRemoveWorthItem(${w.id})"
+              style="padding:4px 8px; background:#dc3545; color:#fff; border:none; border-radius:4px; font-size:12px; cursor:pointer;"
+            >
+              删除
+            </button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function saveWorthList() {
+      try {
+        localStorage.setItem(WORTH_KEY, JSON.stringify(worthList));
+      } catch (e) {
+        log('保存值得列表失败: ' + (e.message || e));
+      }
+    }
+
+    function loadWorthList() {
+      try {
+        const s = localStorage.getItem(WORTH_KEY);
+        if (!s) return;
+        const data = JSON.parse(s);
+        if (Array.isArray(data)) {
+          worthList = data;
+          renderWorthList();
+          log(`已从本地加载 ${worthList.length} 条值得记录`);
+        }
+      } catch (e) {
+        log('加载值得列表失败: ' + (e.message || e));
+      }
+    }
+
+    function clearWorthList() {
+      worthList = [];
+      saveWorthList();
+      renderWorthList();
+      log('已清空值得列表');
+    }
+
+    function removeWorthItem(id) {
+      const before = worthList.length;
+      worthList = worthList.filter(w => String(w.id) !== String(id));
+      if (worthList.length !== before) {
+        saveWorthList();
+        renderWorthList();
+        log(`已从值得列表移除 ID=${id}`);
+      }
+    }
+    
+    async function getRoleDetail(goodsId) {
+      try {
+        const res = await fetch(`${API_ROLE}?GoodsId=${goodsId}`);
+        const data = await res.json();
+        if (data?.result?.[0]?.data) {
+          return parseRoleDetail(data.result[0].data);
+        }
+      } catch (e) {
+        log(`获取详情失败 ID=${goodsId}: ${e.message}`);
+      }
+      return null;
+    }
+    
+    async function run() {
+      const batchSize = Math.max(1, parseInt(document.getElementById('val_batchSize').value, 10) || 5);
+      const needFlow = parseFlows(document.getElementById('val_flow').value.trim());
+      const needRecharge = parseInt(document.getElementById('val_recharge').value, 10) || 0;
+      const needCardDays = parseInt(document.getElementById('val_cardDays').value, 10) || 0;
+      const onlyPresale = document.getElementById('val_onlyPresale').checked;
+      const threshold = getThreshold();
+      
+      log('获取 totalCount...');
+      let total = 0;
+      try {
+        total = await fetchTotalCount();
+      } catch (e) {
+        log('获取总数失败: ' + e.message);
+        showStatus('获取总数失败', 'error');
+        return;
+      }
+      log('当前筛选总数: ' + total);
+      if (total === 0) {
+        showStatus('无商品', 'warning');
+        return;
+      }
+      
+      log('拉取全部列表（ID + 售价）...');
+      let items = [];
+      try {
+        items = await fetchAllItems(total);
+      } catch (e) {
+        log('拉取列表失败: ' + e.message);
+        return;
+      }
+      
+      if (onlyPresale) {
+        const now = Date.now();
+        items = items.filter(it => {
+          const end = it.noticeEndTime ? new Date(it.noticeEndTime).getTime() : 0;
+          return end > now;
+        });
+        log('仅预售筛选后剩余 ' + items.length + ' 条');
+      }
+      
+      log(`共 ${items.length} 个商品，开始并发详情检测（${batchSize}个/批）...`);
+      showStatus(`正在检测 ${items.length} 个商品...`, 'processing');
+      
+      let checkedCount = 0;
+      for (let i = 0; i < items.length; i += batchSize) {
+        if (!running) break;
+        const batch = items.slice(i, i + batchSize);
+        const tasks = batch.map(async (item) => {
+          const detail = await getRoleDetail(item.id);
+          if (!detail) return;
+          if (detail.recharge < needRecharge) return;
+          if (detail.cardDays < needCardDays) return;
+          if (!matchFlow(detail.flow, needFlow)) return;
+          
+          const val = calcValue(detail.market, detail.escort, detail.hasCard);
+          if ((val + threshold) > item.price) {
+            const hit = {
+              id: item.id,
+              name: item.name || `商品${item.id}`,
+              server: item.gameServer?.subName || '未知',
+              price: item.price,
+              market: detail.market,
+              escort: detail.escort,
+              hasCard: detail.hasCard,
+              flow: detail.flow,
+              recharge: detail.recharge,
+              days: detail.cardDays,
+              noticeEndTime: item.noticeEndTime ? new Date(item.noticeEndTime).getTime() : null,
+              noticeEndTimeStr: item.noticeEndTime || ''
+            };
+            if (!worthList.some(w => w.id === hit.id)) {
+              worthList.unshift(hit);
+              renderWorthList();
+              saveWorthList();
+              log(`命中 ID=${hit.id} 赚${(val + threshold - item.price).toFixed(1)}`);
+            }
+          }
+        });
+        await Promise.all(tasks);
+        checkedCount += batch.length;
+        if (checkedCount % 20 === 0) {
+          showStatus(`进度: ${checkedCount}/${items.length}`, 'processing');
+        }
+      }
+      
+      if (running) {
+        log('本轮结束。');
+        showStatus('本轮结束', 'success');
+        document.getElementById('val_btnStart').disabled = false;
+        document.getElementById('val_btnStop').disabled = true;
+        running = false;
+      }
+    }
+    
+    document.getElementById('val_btnSave').onclick = saveSettings;
+    document.getElementById('val_btnStart').onclick = () => {
+      if (running) return;
+      running = true;
+      document.getElementById('val_btnStart').disabled = true;
+      document.getElementById('val_btnStop').disabled = false;
+      worthList = [];
+      renderWorthList();
+      saveWorthList();
+      log('开始运行...');
+      run().finally(() => {
+        running = false;
+        document.getElementById('val_btnStart').disabled = false;
+        document.getElementById('val_btnStop').disabled = true;
+      });
+    };
+    document.getElementById('val_btnStop').onclick = () => {
+      if (!running) return;
+      running = false;
+      log('正在停止...');
+      showStatus('正在停止...', 'warning');
+    };
+    loadSettings();
+    loadWorthList();
+
+    // 暴露给外部按钮使用
+    window.valClearWorthList = clearWorthList;
+    window.valRemoveWorthItem = removeWorthItem;
+    window.valAddToSchedule = function(id) {
+      if (typeof window.createScheduledTask !== 'function') {
+        log('当前页面未加载定时下单功能，无法添加任务');
+        return;
+      }
+      const item = worthList.find(w => String(w.id) === String(id));
+      if (!item) {
+        log(`未在值得列表中找到 ID=${id}，无法添加定时任务`);
+        return;
+      }
+      log(`准备将值得商品 ID=${id} 添加到定时下单任务列表...`);
+      window.createScheduledTask(id).then(() => {
+        log(`✔ 已将 ID=${id} 添加到定时下单任务列表`);
+      }).catch(e => {
+        log(`✘ 添加定时任务失败 ID=${id}: ${e.message || e}`);
+      });
+    };
+  })();
+  </script>
+</body>
+</html>
